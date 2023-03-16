@@ -40,13 +40,11 @@ from telegram.ext import (
 
 from telebot import TeleBot
 
-
 from telegram_bot_calendar import DetailedTelegramCalendar, LSTEP
 
 import mysql.connector
 
-db = mysql.connector.connect(
-    host="localhost", user="root", passwd="bluesky0812", database="DB_AleekkCasino")
+db = mysql.connector.connect(host="localhost", user="root", passwd="bluesky0812", database="DB_AleekkCasino")
 
 cur = db.cursor()
 
@@ -72,7 +70,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-CHOOSE, WALLET, PHONE, ROOMTYPE, CHECKIN, SELECTDATE, CHOOSEBOOKINGSOURCE, STATUS, PAYMENT, PARTIAL, DEPOSIT, DISPLAY, CONFIRM, CHECKOUTDATETOCHECK, DATECHECKED, CHECKROOMTYPE, CONFIRMSELECTION, SELECTADJUST, CONFIRMDELETE, VIEWDELETE, REMINDER, SELECTMARK, MARKANDPAY = range(
+CHOOSE, WALLET, SELECT, ROOMTYPE, CHECKIN, SELECTDATE, CHOOSEBOOKINGSOURCE, STATUS, PAYMENT, PARTIAL, DEPOSIT, DISPLAY, CONFIRM, CHECKOUTDATETOCHECK, DATECHECKED, CHECKROOMTYPE, CONFIRMSELECTION, SELECTADJUST, CONFIRMDELETE, VIEWDELETE, REMINDER, SELECTMARK, MARKANDPAY = range(
     23)
 # DATECHECKED, CHECKROOMTYPE, DISPLAYCHECKED, CONFIRMSELECTION = range(4)
 # DATECHECKED, CHECKROOMTYPE = range(2)
@@ -120,10 +118,48 @@ async def wallet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     )
 
 async def playHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    user = update.message.from_user
-    str_None = f"None\n"
+    str_Guide = f"Which token do you wanna bet?\n"
+    keyboard = [
+        [
+            InlineKeyboardButton("ETH", callback_data="betETH"),
+            InlineKeyboardButton("BNB", callback_data="betBNB"),
+        ],
+        [
+            InlineKeyboardButton("Cancel", callback_data="Cancel"),
+        ]
+    ]
     await update.message.reply_text(
-        str_None
+        str_Guide,
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+    return SELECT
+
+async def betETH(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    n_Balance = 23
+    str_Guide = f"How much do you wanna bet?\nCurrent Balance : {n_Balance} ETH\n"
+    keyboard = [
+        [
+            InlineKeyboardButton("Cancel", callback_data="Cancel"),
+        ]
+    ]
+    await query.message.edit_text(
+        str_Guide,
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+ 
+async def betBNB(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    n_Balance = 233
+    str_Guide = f"How much do you wanna bet?\nCurrent Balance : {n_Balance} BNB\n"
+    keyboard = [
+        [
+            InlineKeyboardButton("Cancel", callback_data="Cancel"),
+        ]
+    ]
+    await query.message.edit_text(
+        str_Guide,
+        reply_markup=InlineKeyboardMarkup(keyboard)
     )
  
 async def playSlot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -163,7 +199,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     user = query.from_user
     await query.answer()
-    await query.message.edit_text("Canceled\nIf you want to do something else, enter /start")
+    await query.message.edit_text("Canceled!\nIf you want to do something else, enter /start")
  
 async def end(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Cancels and ends the conversation."""
@@ -199,6 +235,9 @@ def main() -> None:
                      CallbackQueryHandler(playSlot, pattern="Play Slot"),
                      CallbackQueryHandler(_help, pattern="Help")],
             DEPOSIT: [MessageHandler(filters.TEXT, deposit)],
+            SELECT: [CallbackQueryHandler(betETH, pattern="betETH"),
+                     CallbackQueryHandler(betBNB, pattern="betBNB"),
+                     CallbackQueryHandler(cancel, pattern="Cancel")],
         },
         fallbacks=[CommandHandler("end", end)],
         allow_reentry=True,
