@@ -13,7 +13,7 @@ from json import JSONEncoder
 import datetime
 import json
 import logging
-
+import random
 from telegram import __version__ as TG_VER
 
 try:
@@ -54,7 +54,10 @@ class DateTimeEncoder(JSONEncoder):
         if isinstance(obj, (datetime.date, datetime.datetime)):
             return obj.isoformat()
 
-
+g_Cashout = 0
+g_Flowers = ['♠️', '♥️', '♣️', '♦️']
+g_Numbers = ['A','2','3','4','5','6','7','8','9','10','J','Q','K']
+UserName = ""
 TOKEN = "6282215563:AAFiWA4Owjxl0n9gfelo2jejlYScz7-UeJI"
 g_Greetings = f"/start - Enter the casino\n"
 g_Help = f"/help - Describe all guide\n"
@@ -70,8 +73,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-CHOOSE, WALLET, SELECT, ROOMTYPE, CHECKIN, SELECTDATE, CHOOSEBOOKINGSOURCE, STATUS, PAYMENT, PARTIAL, DEPOSIT, DISPLAY, CONFIRM, CHECKOUTDATETOCHECK, DATECHECKED, CHECKROOMTYPE, CONFIRMSELECTION, SELECTADJUST, CONFIRMDELETE, VIEWDELETE, REMINDER, SELECTMARK, MARKANDPAY = range(
-    23)
+CHOOSE, WALLET, SELECT, STATUS, PAYMENT, DEPOSIT, DISPLAY, PANELHILO, PANELSLOT= range(9)
 ST_DEPOSIT, ST_WITHDRAW, ST_HILO, ST_SLOT = range(4)
 ETH, BNB = range(2)
 guestinformation = {}
@@ -94,10 +96,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     # Start the bot and ask what to do when the command /start is issued.
     user = update.effective_user
     userInfo = update.message.from_user
-    str_Greetings = f"🙋‍♀️Hi @{userInfo['username']}\nWelcome to Aleekk Casino!\n"
+    global UserName
+    UserName = userInfo['username']
+    str_Greetings = f"🙋‍♀️Hi @{UserName}\nWelcome to Aleekk Casino!\n"
     str_Intro = f"Please enjoy High-Low & Slot machine games here.\n"
     print('You talk with user {} and his user ID: {} '.format(userInfo['username'], userInfo['id']))
-    guestinformation = {}
+    # guestinformation = {}
     if context.user_data.get("adjustID"):
         context.user_data["adjustID"]=""
     keyboard = [
@@ -122,12 +126,20 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return CHOOSE
 
 async def wallet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    user = update.message.from_user
-    address = "0x1234567890abcdefghijklmnopqrstuvwxyz987"
-    eth_amount = await getBalance(ETH)
-    bnb_amount = await getBalance(BNB)
+    address = await getWallet(UserName)
+    eth_amount = await getBalance(address, ETH)
+    bnb_amount = await getBalance(address, BNB)
     await update.message.reply_text(
-        f"{user['username']}'s wallet\nAddress : {address}\nETH : {eth_amount}\nBNB : {bnb_amount}"
+        f"@{UserName}'s wallet\nAddress : {address}\nETH : {eth_amount}\nBNB : {bnb_amount}\n/start"
+    )
+
+async def _wallet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    address = await getWallet(UserName)
+    eth_amount = await getBalance(address, ETH)
+    bnb_amount = await getBalance(address, BNB)
+    query = update.callback_query
+    await query.message.edit_text(
+        f"@{UserName}'s wallet\nAddress : {address}\nETH : {eth_amount}\nBNB : {bnb_amount}\n/start"
     )
 
 async def playHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -204,16 +216,18 @@ async def _eth_bnb_dlg(update: Update, msg : str) -> int:
     return SELECT
  
 async def funcETH(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    n_Balance = await getBalance(ETH)
+    address = await getWallet(UserName)
+    n_Balance = await getBalance(address, ETH)
     str_Guide = f"How much do you wanna bet?\nCurrent Balance : {n_Balance} ETH\n"
-    return await cancel_dlg(update, str_Guide)
+    return await confirm_dlg(update, str_Guide)
  
 async def funcBNB(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    n_Balance = await getBalance(BNB)
+    address = await getWallet(UserName)
+    n_Balance = await getBalance(address, BNB)
     str_Guide = f"How much do you wanna bet?\nCurrent Balance : {n_Balance} BNB\n"
-    return await cancel_dlg(update, str_Guide)
+    return await confirm_dlg(update, str_Guide)
 
-async def cancel_dlg(update: Update, msg : str) -> int:
+async def confirm_dlg(update: Update, msg : str) -> int:
     query = update.callback_query
     keyboard = [
         [
@@ -223,6 +237,52 @@ async def cancel_dlg(update: Update, msg : str) -> int:
     await query.message.edit_text(
         msg,
         reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+    # ForceReply(selective=True) #TODO
+    match g_STATUS:
+        case 0: #ST_DEPOSIT
+            return PANELHILO #TODO
+        case 1: #ST_WITHDRAW
+            return PANELHILO #TODO
+        case 2: #ST_HILO
+            return PANELHILO
+        case 3: #ST_SLOT
+            return PANELSLOT
+
+async def panelHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    betAmount = float(update.message.text)
+    print(betAmount)
+    newCard = getRandCard()
+    keyboard = []
+    sGreeting = ""
+    if g_Cashout > 0 :
+        sGreeting = "You Win!\n"
+        keyboard = [
+            [
+                InlineKeyboardButton("High", callback_data="High"),
+                InlineKeyboardButton("Low", callback_data="Low"),
+            ],
+            [
+                InlineKeyboardButton("Cashout", callback_data="Cashout"),
+            ]
+        ]
+    else :
+        sGreeting = "Enjoy!\n"
+        keyboard = [
+            [
+                InlineKeyboardButton("High", callback_data="High"),
+                InlineKeyboardButton("Low", callback_data="Low"),
+            ]
+        ]
+    await update.message.reply_text(
+        f"{sGreeting}Card   :   {str(newCard['label'])}\nWhat is your next guessing? H or L?",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def panelSlot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await update.message.reply_text(
+        g_Greetings + g_Help + g_Wallet + g_Deposit + g_Withdraw + g_Hilo + g_Slot
     )
 
 async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -253,7 +313,18 @@ async def end(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
     return ConversationHandler.END
 
-async def getBalance(token : int) -> int:
+def getRandCard() -> dict:
+    d = dict()
+    num = random.randint(1, 13)
+    d['value'] = num
+    d['label'] = random.choice(g_Flowers) + g_Numbers[num-1]
+    return d
+
+async def getWallet(userName : str) -> str:
+    walletAddress = "0x1234567890abcdefghijklmnopqrstuvwxyz987"
+    return walletAddress
+
+async def getBalance(address : str, token : int) -> int:
     nBalance = 0
     match token:
         case 0: # ETH
@@ -280,7 +351,7 @@ def main() -> None:
             WALLET: [MessageHandler("wallet", wallet)],
             CHOOSE: [CallbackQueryHandler(_deposit, pattern="Deposit"),
                      CallbackQueryHandler(_withdraw, pattern="Withdraw"),
-                     CallbackQueryHandler(wallet, pattern="Balance"),
+                     CallbackQueryHandler(_wallet, pattern="Balance"),
                      CallbackQueryHandler(_playHilo, pattern="Play Hilo"),
                      CallbackQueryHandler(_playSlot, pattern="Play Slot"),
                      CallbackQueryHandler(_help, pattern="Help")],
@@ -288,6 +359,8 @@ def main() -> None:
             SELECT: [CallbackQueryHandler(funcETH, pattern="funcETH"),
                      CallbackQueryHandler(funcBNB, pattern="funcBNB"),
                      CallbackQueryHandler(cancel, pattern="Cancel")],
+            PANELHILO: [MessageHandler(filters.TEXT, panelHilo)],
+            PANELSLOT: [MessageHandler(filters.TEXT, panelSlot)],
         },
         fallbacks=[CommandHandler("end", end)],
         allow_reentry=True,
