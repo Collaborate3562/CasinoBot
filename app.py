@@ -75,7 +75,15 @@ CHOOSE, WALLET, SELECT, ROOMTYPE, CHECKIN, SELECTDATE, CHOOSEBOOKINGSOURCE, STAT
 # DATECHECKED, CHECKROOMTYPE, DISPLAYCHECKED, CONFIRMSELECTION = range(4)
 # DATECHECKED, CHECKROOMTYPE = range(2)
 guestinformation = {}
-
+g_Game = 0
+def getGame(game):
+    sGame = ""
+    match game:
+        case 1:
+            sGames = "Hilo"
+        case 2:
+            sGames = "Slot"        
+    return sGame
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     # Start the bot and ask what to do when the command /start is issued.
@@ -118,22 +126,15 @@ async def wallet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     )
 
 async def playHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    str_Guide = f"Which token do you wanna bet?\n"
-    keyboard = [
-        [
-            InlineKeyboardButton("ETH", callback_data="betETH"),
-            InlineKeyboardButton("BNB", callback_data="betBNB"),
-        ],
-        [
-            InlineKeyboardButton("Cancel", callback_data="Cancel"),
-        ]
-    ]
-    await update.message.reply_text(
-        str_Guide,
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
-    return SELECT
+    g_Game = 1
+    str_Guide = f"Hilo!🧑‍🤝‍🧑\nWhich token do you wanna bet?\n"
+    await eth_bnb_dlg(update, str_Guide)
 
+async def playSlot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    g_Game = 2
+    str_Guide = f"Slot!🌺🌺🌺\nWhich token do you wanna bet?\n"
+    await eth_bnb_dlg(update, str_Guide)
+ 
 async def betETH(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     n_Balance = 23
@@ -162,26 +163,29 @@ async def betBNB(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
  
-async def playSlot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    user = update.message.from_user
-    str_None = f"None\n"
-    await update.message.reply_text(
-        str_None
-    )
- 
 async def deposit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    user = update.message.from_user
-    str_None = f"None\n"
-    await update.message.reply_text(
-        str_None
-    )
- 
+    str_Guide = f"💰 Please select token to deposit\n"
+    await eth_bnb_dlg(update, str_Guide)
+
 async def withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    user = update.message.from_user
-    str_None = f"None\n"
+    str_Guide = f"💰 Please select token to withdraw\n"
+    await eth_bnb_dlg(update, str_Guide)
+
+async def eth_bnb_dlg(update: Update, msg : str) -> int:
+    keyboard = [
+        [
+            InlineKeyboardButton("ETH", callback_data="betETH"),
+            InlineKeyboardButton("BNB", callback_data="betBNB"),
+        ],
+        [
+            InlineKeyboardButton("Cancel", callback_data="Cancel"),
+        ]
+    ]
     await update.message.reply_text(
-        str_None
+        msg,
+        reply_markup=InlineKeyboardMarkup(keyboard)
     )
+    return SELECT
  
 async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     await update.message.reply_text(
