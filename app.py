@@ -72,16 +72,21 @@ logger = logging.getLogger(__name__)
 
 CHOOSE, WALLET, SELECT, ROOMTYPE, CHECKIN, SELECTDATE, CHOOSEBOOKINGSOURCE, STATUS, PAYMENT, PARTIAL, DEPOSIT, DISPLAY, CONFIRM, CHECKOUTDATETOCHECK, DATECHECKED, CHECKROOMTYPE, CONFIRMSELECTION, SELECTADJUST, CONFIRMDELETE, VIEWDELETE, REMINDER, SELECTMARK, MARKANDPAY = range(
     23)
-# DATECHECKED, CHECKROOMTYPE, DISPLAYCHECKED, CONFIRMSELECTION = range(4)
-# DATECHECKED, CHECKROOMTYPE = range(2)
+ST_DEPOSIT, ST_WITHDRAW, ST_HILO, ST_SLOT = range(4)
+ETH, BNB = range(2)
 guestinformation = {}
-g_Game = 0
-def getGame(game):
+g_STATUS = 0
+
+def getGame(status):
     sGame = ""
-    match game:
+    match status:
+        case 0:
+            sGames = "Deposit"
         case 1:
-            sGames = "Hilo"
+            sGames = "Withdraw"
         case 2:
+            sGames = "Hilo"
+        case 3:
             sGames = "Slot"        
     return sGame
 
@@ -126,56 +131,30 @@ async def wallet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     )
 
 async def playHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    g_Game = 1
+    g_STATUS = ST_HILO
     str_Guide = f"Hilo!🧑‍🤝‍🧑\nWhich token do you wanna bet?\n"
-    await eth_bnb_dlg(update, str_Guide)
+    return await eth_bnb_dlg(update, str_Guide)
 
 async def playSlot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    g_Game = 2
+    g_STATUS = ST_SLOT
     str_Guide = f"Slot!🌺🌺🌺\nWhich token do you wanna bet?\n"
-    await eth_bnb_dlg(update, str_Guide)
- 
-async def betETH(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    query = update.callback_query
-    n_Balance = 23
-    str_Guide = f"How much do you wanna bet?\nCurrent Balance : {n_Balance} ETH\n"
-    keyboard = [
-        [
-            InlineKeyboardButton("Cancel", callback_data="Cancel"),
-        ]
-    ]
-    await query.message.edit_text(
-        str_Guide,
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
- 
-async def betBNB(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    query = update.callback_query
-    n_Balance = 233
-    str_Guide = f"How much do you wanna bet?\nCurrent Balance : {n_Balance} BNB\n"
-    keyboard = [
-        [
-            InlineKeyboardButton("Cancel", callback_data="Cancel"),
-        ]
-    ]
-    await query.message.edit_text(
-        str_Guide,
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    return await eth_bnb_dlg(update, str_Guide)
  
 async def deposit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    g_STATUS = ST_DEPOSIT
     str_Guide = f"💰 Please select token to deposit\n"
-    await eth_bnb_dlg(update, str_Guide)
+    return await eth_bnb_dlg(update, str_Guide)
 
 async def withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    g_STATUS = ST_WITHDRAW
     str_Guide = f"💰 Please select token to withdraw\n"
-    await eth_bnb_dlg(update, str_Guide)
+    return await eth_bnb_dlg(update, str_Guide)
 
 async def eth_bnb_dlg(update: Update, msg : str) -> int:
     keyboard = [
         [
-            InlineKeyboardButton("ETH", callback_data="betETH"),
-            InlineKeyboardButton("BNB", callback_data="betBNB"),
+            InlineKeyboardButton("ETH", callback_data="funcETH"),
+            InlineKeyboardButton("BNB", callback_data="funcBNB"),
         ],
         [
             InlineKeyboardButton("Cancel", callback_data="Cancel"),
@@ -187,6 +166,28 @@ async def eth_bnb_dlg(update: Update, msg : str) -> int:
     )
     return SELECT
  
+async def funcETH(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    n_Balance = await getBalance(ETH)
+    str_Guide = f"How much do you wanna bet?\nCurrent Balance : {n_Balance} ETH\n"
+    return await cancel_dlg(update, str_Guide)
+ 
+async def funcBNB(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    n_Balance = await getBalance(BNB)
+    str_Guide = f"How much do you wanna bet?\nCurrent Balance : {n_Balance} BNB\n"
+    return await cancel_dlg(update, str_Guide)
+
+async def cancel_dlg(update: Update, msg : str) -> int:
+    query = update.callback_query
+    keyboard = [
+        [
+            InlineKeyboardButton("Cancel", callback_data="Cancel"),
+        ]
+    ]
+    await query.message.edit_text(
+        msg,
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
 async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     await update.message.reply_text(
         g_Greetings + g_Help + g_Wallet + g_Deposit + g_Withdraw + g_Hilo + g_Slot
@@ -215,6 +216,14 @@ async def end(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
     return ConversationHandler.END
 
+async def getBalance(token : int) -> int:
+    nBalance = 0
+    match token:
+        case 0: # ETH
+            nBalance = 456
+        case 1: # BNB
+            nBalance = 123
+    return nBalance
 
 def main() -> None:
     """Run the bot."""
@@ -239,8 +248,8 @@ def main() -> None:
                      CallbackQueryHandler(playSlot, pattern="Play Slot"),
                      CallbackQueryHandler(_help, pattern="Help")],
             DEPOSIT: [MessageHandler(filters.TEXT, deposit)],
-            SELECT: [CallbackQueryHandler(betETH, pattern="betETH"),
-                     CallbackQueryHandler(betBNB, pattern="betBNB"),
+            SELECT: [CallbackQueryHandler(funcETH, pattern="funcETH"),
+                     CallbackQueryHandler(funcBNB, pattern="funcBNB"),
                      CallbackQueryHandler(cancel, pattern="Cancel")],
         },
         fallbacks=[CommandHandler("end", end)],
