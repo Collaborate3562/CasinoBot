@@ -123,9 +123,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def wallet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user = update.message.from_user
-    address = "0x123456abcd"
-    eth_amount = 50
-    bnb_amount = 10
+    address = "0x1234567890abcdefghijklmnopqrstuvwxyz987"
+    eth_amount = await getBalance(ETH)
+    bnb_amount = await getBalance(BNB)
     await update.message.reply_text(
         f"{user['username']}'s wallet\nAddress : {address}\nETH : {eth_amount}\nBNB : {bnb_amount}"
     )
@@ -135,20 +135,40 @@ async def playHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     str_Guide = f"Hilo!🧑‍🤝‍🧑\nWhich token do you wanna bet?\n"
     return await eth_bnb_dlg(update, str_Guide)
 
+async def _playHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    g_STATUS = ST_HILO
+    str_Guide = f"Hilo!🧑‍🤝‍🧑\nWhich token do you wanna bet?\n"
+    return await _eth_bnb_dlg(update, str_Guide)
+
 async def playSlot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     g_STATUS = ST_SLOT
     str_Guide = f"Slot!🌺🌺🌺\nWhich token do you wanna bet?\n"
     return await eth_bnb_dlg(update, str_Guide)
+ 
+async def _playSlot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    g_STATUS = ST_SLOT
+    str_Guide = f"Slot!🌺🌺🌺\nWhich token do you wanna bet?\n"
+    return await _eth_bnb_dlg(update, str_Guide)
  
 async def deposit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     g_STATUS = ST_DEPOSIT
     str_Guide = f"💰 Please select token to deposit\n"
     return await eth_bnb_dlg(update, str_Guide)
 
+async def _deposit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    g_STATUS = ST_DEPOSIT
+    str_Guide = f"💰 Please select token to deposit\n"
+    return await _eth_bnb_dlg(update, str_Guide)
+
 async def withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     g_STATUS = ST_WITHDRAW
     str_Guide = f"💰 Please select token to withdraw\n"
     return await eth_bnb_dlg(update, str_Guide)
+
+async def _withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    g_STATUS = ST_WITHDRAW
+    str_Guide = f"💰 Please select token to withdraw\n"
+    return await _eth_bnb_dlg(update, str_Guide)
 
 async def eth_bnb_dlg(update: Update, msg : str) -> int:
     keyboard = [
@@ -161,6 +181,23 @@ async def eth_bnb_dlg(update: Update, msg : str) -> int:
         ]
     ]
     await update.message.reply_text(
+        msg,
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+    return SELECT
+
+async def _eth_bnb_dlg(update: Update, msg : str) -> int:
+    query = update.callback_query
+    keyboard = [
+        [
+            InlineKeyboardButton("ETH", callback_data="funcETH"),
+            InlineKeyboardButton("BNB", callback_data="funcBNB"),
+        ],
+        [
+            InlineKeyboardButton("Cancel", callback_data="Cancel"),
+        ]
+    ]
+    await query.message.edit_text(
         msg,
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
@@ -241,11 +278,11 @@ def main() -> None:
                       CommandHandler("deposit", deposit)],
         states={
             WALLET: [MessageHandler("wallet", wallet)],
-            CHOOSE: [CallbackQueryHandler(deposit, pattern="Deposit"),
-                     CallbackQueryHandler(withdraw, pattern="Withdraw"),
+            CHOOSE: [CallbackQueryHandler(_deposit, pattern="Deposit"),
+                     CallbackQueryHandler(_withdraw, pattern="Withdraw"),
                      CallbackQueryHandler(wallet, pattern="Balance"),
-                     CallbackQueryHandler(playHilo, pattern="Play Hilo"),
-                     CallbackQueryHandler(playSlot, pattern="Play Slot"),
+                     CallbackQueryHandler(_playHilo, pattern="Play Hilo"),
+                     CallbackQueryHandler(_playSlot, pattern="Play Slot"),
                      CallbackQueryHandler(_help, pattern="Help")],
             DEPOSIT: [MessageHandler(filters.TEXT, deposit)],
             SELECT: [CallbackQueryHandler(funcETH, pattern="funcETH"),
