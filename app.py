@@ -66,14 +66,16 @@ g_Deposit = f"/deposit - Deposit ETH or BNB into your wallet\n"
 g_Withdraw = f"/withdraw - Withdraw ETH or BNB from your wallet\n"
 g_Hilo = f"/hilo - Play hilo casino game\n"
 g_Slot = f"/slot - Play slot casino game\n"
-
+g_PrevCard = None
+g_NextCard = None
+g_HiloOn = False
 # Enable logging
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
-CHOOSE, WALLET, SELECT, STATUS, PAYMENT, DEPOSIT, DISPLAY, PANELHILO, PANELSLOT= range(9)
+CHOOSE, WALLET, SELECT, STATUS, PAYMENT, DEPOSIT, DISPLAY, PANELHILO, PANELSLOT, BETTINGHILO = range(10)
 ST_DEPOSIT, ST_WITHDRAW, ST_HILO, ST_SLOT = range(4)
 ETH, BNB = range(2)
 guestinformation = {}
@@ -94,6 +96,7 @@ def getGame(status):
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     # Start the bot and ask what to do when the command /start is issued.
+    init()
     user = update.effective_user
     userInfo = update.message.from_user
     global UserName
@@ -143,11 +146,13 @@ async def _wallet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     )
 
 async def playHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    init()
     g_STATUS = ST_HILO
     str_Guide = f"Hilo!🧑‍🤝‍🧑\nWhich token do you wanna bet?\n"
     return await eth_bnb_dlg(update, str_Guide)
 
 async def _playHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    init()
     g_STATUS = ST_HILO
     str_Guide = f"Hilo!🧑‍🤝‍🧑\nWhich token do you wanna bet?\n"
     return await _eth_bnb_dlg(update, str_Guide)
@@ -250,36 +255,96 @@ async def confirm_dlg(update: Update, msg : str) -> int:
             return PANELSLOT
 
 async def panelHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    betAmount = float(update.message.text)
-    print(betAmount)
-    newCard = getRandCard()
+    global g_PrevCard
     keyboard = []
+    newCard = g_NextCard #For initialize
     sGreeting = ""
     if g_Cashout > 0 :
         sGreeting = "You Win!\n"
+        print(g_NextCard)
+        newCard = g_NextCard
+        g_PrevCard = newCard
+        print(newCard)
+        print(g_PrevCard)
         keyboard = [
             [
                 InlineKeyboardButton("High", callback_data="High"),
                 InlineKeyboardButton("Low", callback_data="Low"),
             ],
             [
-                InlineKeyboardButton("Cashout", callback_data="Cashout"),
+                InlineKeyboardButton("Cashout", callback_data="CashoutHilo"),
             ]
         ]
+        query = update.callback_query
+        await query.message.edit_text(
+            f"{sGreeting}Card   :   {str(newCard['label'])}\nWhat is your next guessing? H or L?",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return BETTINGHILO
     else :
+        betAmount = float(update.message.text)
+        print(betAmount)
         sGreeting = "Enjoy!\n"
+        newCard = getRandCard()
+        g_PrevCard = newCard
         keyboard = [
             [
                 InlineKeyboardButton("High", callback_data="High"),
                 InlineKeyboardButton("Low", callback_data="Low"),
             ]
         ]
+        await update.message.reply_text(
+            f"{sGreeting}Card   :   {str(newCard['label'])}\nWhat is your next guessing? H or L?",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return BETTINGHILO
+
+async def _high(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    global g_HiloOn; g_HiloOn = True
+    global g_Cashout
+    global g_NextCard
+    card = getRandCard()
+    print(card)
+    if card['value'] > g_PrevCard['value']:
+        print("High=>TRUE")
+        g_Cashout += 1 
+        g_NextCard = card
+        return await panelHilo(update, context)
+    else :
+        print("High=>FALSE")
+        init()
+        g_Cashout = 0
+        query = update.callback_query
+        await query.message.edit_text(
+            "You Lose! /start /hilo"
+        )
+
+async def _low(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    global g_HiloOn; g_HiloOn = True
+    global g_Cashout
+    global g_NextCard
+    card = getRandCard()
+    print(card)
+    if card['value'] < g_PrevCard['value']:
+        print("LOW=>TRUE")
+        g_NextCard = card
+        g_Cashout += 1 
+        await panelHilo(update, context)
+    else :
+        print("LOW=>FALSE")
+        g_Cashout = 0
+        init()
+        query = update.callback_query
+        await query.message.edit_text(
+            "You Lose! /start /hilo"
+        )
+
+async def _cashoutHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    global g_HiloOn; g_HiloOn = False
     await update.message.reply_text(
-        f"{sGreeting}Card   :   {str(newCard['label'])}\nWhat is your next guessing? H or L?",
-        reply_markup=InlineKeyboardMarkup(keyboard)
+        g_Greetings + g_Help + g_Wallet + g_Deposit + g_Withdraw + g_Hilo + g_Slot
     )
-
-
+    
 async def panelSlot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     await update.message.reply_text(
         g_Greetings + g_Help + g_Wallet + g_Deposit + g_Withdraw + g_Hilo + g_Slot
@@ -310,9 +375,14 @@ async def end(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     await update.message.reply_text(
         "Bye! I hope we can talk again some day.", reply_markup=ReplyKeyboardRemove()
     )
-
     return ConversationHandler.END
 
+def init():
+    global g_Cashout;   g_Cashout = 0
+    global g_HiloOn;    g_HiloOn = False
+    global g_NextCard;  g_NextCard = None
+    global g_PrevCard;  g_PrevCard = None
+    
 def getRandCard() -> dict:
     d = dict()
     num = random.randint(1, 13)
@@ -361,6 +431,9 @@ def main() -> None:
                      CallbackQueryHandler(cancel, pattern="Cancel")],
             PANELHILO: [MessageHandler(filters.TEXT, panelHilo)],
             PANELSLOT: [MessageHandler(filters.TEXT, panelSlot)],
+            BETTINGHILO: [CallbackQueryHandler(_cashoutHilo, pattern="CashoutHilo"),
+                          CallbackQueryHandler(_high, pattern="High"),
+                          CallbackQueryHandler(_low, pattern="Low"),]
         },
         fallbacks=[CommandHandler("end", end)],
         allow_reentry=True,
