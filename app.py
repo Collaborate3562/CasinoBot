@@ -14,6 +14,7 @@ import datetime
 import json
 import logging
 import random
+import pyperclip
 from telegram import __version__ as TG_VER
 
 try:
@@ -27,7 +28,7 @@ if __version_info__ < (20, 0, 0, "alpha", 5):
         f"{TG_VER} version of this example, "
         f"visit https://docs.python-telegram-bot.org/en/v{TG_VER}/examples.html"
     )
-from telegram import ForceReply, ReplyKeyboardRemove, Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import ForceReply, ReplyKeyboardRemove, Update, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -75,7 +76,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-CHOOSE, WALLET, SELECT, STATUS, PAYMENT, DEPOSIT, DISPLAY, PANELHILO, PANELSLOT, BETTINGHILO = range(10)
+CHOOSE, WALLET, SELECT, STATUS, PAYMENT, DEPOSIT, DISPLAY, COPY, PANELHILO, PANELSLOT, BETTINGHILO, PANELDEPOSIT, PANELWITHDRAW = range(13)
 ST_DEPOSIT, ST_WITHDRAW, ST_HILO, ST_SLOT = range(4)
 ETH, BNB = range(2)
 guestinformation = {}
@@ -233,13 +234,25 @@ async def _eth_bnb_dlg(update: Update, msg : str) -> int:
 async def funcETH(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     address = await getWallet(UserName)
     n_Balance = await getBalance(address, ETH)
-    str_Guide = f"How much do you wanna bet?\nCurrent Balance : {n_Balance} ETH\n"
+    str_Guide = ""
+    if g_STATUS == ST_DEPOSIT:
+        return await panelDeposit(update, context)
+    if g_STATUS == ST_WITHDRAW :
+        str_Guide = f"How much do you wanna withdraw?\nCurrent Balance : {n_Balance} ETH\n"
+    else :
+        str_Guide = f"How much do you wanna bet?\nCurrent Balance : {n_Balance} ETH\n"
     return await confirm_dlg(update, str_Guide)
  
 async def funcBNB(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     address = await getWallet(UserName)
     n_Balance = await getBalance(address, BNB)
-    str_Guide = f"How much do you wanna bet?\nCurrent Balance : {n_Balance} BNB\n"
+    str_Guide = ""
+    if g_STATUS == ST_DEPOSIT:
+        return await panelDeposit(update, context)
+    if g_STATUS == ST_WITHDRAW :
+        str_Guide = f"How much do you wanna withdraw?\nCurrent Balance : {n_Balance} BNB\n"
+    else :
+        str_Guide = f"How much do you wanna bet?\nCurrent Balance : {n_Balance} BNB\n"
     return await confirm_dlg(update, str_Guide)
 
 async def confirm_dlg(update: Update, msg : str) -> int:
@@ -256,9 +269,9 @@ async def confirm_dlg(update: Update, msg : str) -> int:
     # ForceReply(selective=True) #TODO
     match g_STATUS:
         case 0: #ST_DEPOSIT
-            return PANELHILO #TODO
+            return PANELDEPOSIT
         case 1: #ST_WITHDRAW
-            return PANELHILO #TODO
+            return PANELWITHDRAW
         case 2: #ST_HILO
             return PANELHILO
         case 3: #ST_SLOT
@@ -371,6 +384,26 @@ async def panelSlot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         f"{label}\nYou {res}/start /slot"
     )
 
+async def panelDeposit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    address = await getWallet(UserName)
+    query = update.callback_query
+    pattern = f"copyToClipboard:{address}"
+    keyboard = [
+        [
+            InlineKeyboardButton("Copy", callback_data=pattern),
+        ],
+    ]
+    await query.message.edit_text(
+        f"You can deposit here!\n{address}",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+    return COPY
+
+async def panelWithdraw(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await update.message.reply_text(
+        "Submit your withdraw request",
+    )
+
 async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     await update.message.reply_text(
         g_Greetings + g_Help + g_Wallet + g_Deposit + g_Withdraw + g_Hilo + g_Slot
@@ -403,6 +436,14 @@ def init():
     global g_Cashout;       g_Cashout = 0
     global g_NextCard;      g_NextCard = None
     global g_PrevCard;      g_PrevCard = None
+
+async def copyToClipboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query: CallbackQuery = update.callback_query
+    query.answer()
+    param = query.data.split(":")[1]  
+    pyperclip.copy(param)
+    print(param)
+    pyperclip.paste()
 
 def getCell(num : int) -> str:
     cell = ""
@@ -477,11 +518,14 @@ def main() -> None:
                      CallbackQueryHandler(_playSlot, pattern="Play Slot"),
                      CallbackQueryHandler(_help, pattern="Help")],
             DEPOSIT: [MessageHandler(filters.TEXT, deposit)],
+            COPY: [CallbackQueryHandler(copyToClipboard, pattern="^copyToClipboard:")],
             SELECT: [CallbackQueryHandler(funcETH, pattern="funcETH"),
                      CallbackQueryHandler(funcBNB, pattern="funcBNB"),
                      CallbackQueryHandler(cancel, pattern="Cancel")],
             PANELHILO: [MessageHandler(filters.TEXT, panelHilo)],
             PANELSLOT: [MessageHandler(filters.TEXT, panelSlot)],
+            PANELDEPOSIT: [MessageHandler(filters.TEXT, panelDeposit)],
+            PANELWITHDRAW: [MessageHandler(filters.TEXT, panelWithdraw)],
             BETTINGHILO: [CallbackQueryHandler(_cashoutHilo, pattern="CashoutHilo"),
                           CallbackQueryHandler(_high, pattern="High"),
                           CallbackQueryHandler(_low, pattern="Low"),]
