@@ -68,7 +68,7 @@ g_Hilo = f"/hilo - Play hilo casino game\n"
 g_Slot = f"/slot - Play slot casino game\n"
 g_PrevCard = None
 g_NextCard = None
-g_HiloOn = False
+g_CardHistory = ""
 # Enable logging
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
@@ -260,7 +260,7 @@ async def panelHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     newCard = g_NextCard #For initialize
     sGreeting = ""
     if g_Cashout > 0 :
-        sGreeting = "You Win!\n"
+        sGreeting = f"You Win!\n{g_CardHistory}Cashout : x{g_Cashout}\n"
         print(g_NextCard)
         newCard = g_NextCard
         g_PrevCard = newCard
@@ -300,32 +300,35 @@ async def panelHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         return BETTINGHILO
 
 async def _high(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    global g_HiloOn; g_HiloOn = True
     global g_Cashout
     global g_NextCard
+    global g_CardHistory
     card = getRandCard()
     print(card)
     if card['value'] > g_PrevCard['value']:
+        g_CardHistory = g_CardHistory + g_PrevCard['label'] + "\n"
         print("High=>TRUE")
         g_Cashout += 1 
         g_NextCard = card
         return await panelHilo(update, context)
     else :
         print("High=>FALSE")
+        sCardHistory = g_CardHistory
         init()
         g_Cashout = 0
         query = update.callback_query
         await query.message.edit_text(
-            "You Lose! /start /hilo"
+            f"{sCardHistory}😢😢😢\n{card['label']}\nYou Lose!\n/start /hilo"
         )
 
 async def _low(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    global g_HiloOn; g_HiloOn = True
     global g_Cashout
     global g_NextCard
+    global g_CardHistory
     card = getRandCard()
     print(card)
     if card['value'] < g_PrevCard['value']:
+        g_CardHistory = g_CardHistory + g_PrevCard['label'] + "\n"
         print("LOW=>TRUE")
         g_NextCard = card
         g_Cashout += 1 
@@ -333,14 +336,14 @@ async def _low(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     else :
         print("LOW=>FALSE")
         g_Cashout = 0
+        sCardHistory = g_CardHistory
         init()
         query = update.callback_query
         await query.message.edit_text(
-            "You Lose! /start /hilo"
+            f"{sCardHistory}😢😢😢\n{card['label']}\nYou Lose!\n/start /hilo"
         )
 
 async def _cashoutHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    global g_HiloOn; g_HiloOn = False
     await update.message.reply_text(
         g_Greetings + g_Help + g_Wallet + g_Deposit + g_Withdraw + g_Hilo + g_Slot
     )
@@ -378,10 +381,10 @@ async def end(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return ConversationHandler.END
 
 def init():
-    global g_Cashout;   g_Cashout = 0
-    global g_HiloOn;    g_HiloOn = False
-    global g_NextCard;  g_NextCard = None
-    global g_PrevCard;  g_PrevCard = None
+    global g_CardHistory;   g_CardHistory = ""
+    global g_Cashout;       g_Cashout = 0
+    global g_NextCard;      g_NextCard = None
+    global g_PrevCard;      g_PrevCard = None
     
 def getRandCard() -> dict:
     d = dict()
