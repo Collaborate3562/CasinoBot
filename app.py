@@ -147,42 +147,52 @@ async def _wallet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def playHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     init()
+    global g_STATUS
     g_STATUS = ST_HILO
     str_Guide = f"Hilo!🧑‍🤝‍🧑\nWhich token do you wanna bet?\n"
     return await eth_bnb_dlg(update, str_Guide)
 
 async def _playHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     init()
+    global g_STATUS
     g_STATUS = ST_HILO
     str_Guide = f"Hilo!🧑‍🤝‍🧑\nWhich token do you wanna bet?\n"
     return await _eth_bnb_dlg(update, str_Guide)
 
 async def playSlot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    init()
+    global g_STATUS
     g_STATUS = ST_SLOT
     str_Guide = f"Slot!🌺🌺🌺\nWhich token do you wanna bet?\n"
     return await eth_bnb_dlg(update, str_Guide)
  
 async def _playSlot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    init()
+    global g_STATUS
     g_STATUS = ST_SLOT
     str_Guide = f"Slot!🌺🌺🌺\nWhich token do you wanna bet?\n"
     return await _eth_bnb_dlg(update, str_Guide)
  
 async def deposit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    global g_STATUS
     g_STATUS = ST_DEPOSIT
     str_Guide = f"💰 Please select token to deposit\n"
     return await eth_bnb_dlg(update, str_Guide)
 
 async def _deposit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    global g_STATUS
     g_STATUS = ST_DEPOSIT
     str_Guide = f"💰 Please select token to deposit\n"
     return await _eth_bnb_dlg(update, str_Guide)
 
 async def withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    global g_STATUS
     g_STATUS = ST_WITHDRAW
     str_Guide = f"💰 Please select token to withdraw\n"
     return await eth_bnb_dlg(update, str_Guide)
 
 async def _withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    global g_STATUS
     g_STATUS = ST_WITHDRAW
     str_Guide = f"💰 Please select token to withdraw\n"
     return await _eth_bnb_dlg(update, str_Guide)
@@ -386,7 +396,37 @@ def init():
     global g_Cashout;       g_Cashout = 0
     global g_NextCard;      g_NextCard = None
     global g_PrevCard;      g_PrevCard = None
-    
+
+def getCell(num : int) -> str:
+    cell = ""
+    match num:
+        case 0:
+            cell="🍉"
+        case 1:
+            cell="🍎"
+        case 2:
+            cell="🍌"
+        case 3:
+            cell="7️⃣"
+        case 4:
+            cell="🌺"
+    return cell
+
+def roll() -> dict:
+    slot = dict()
+    num1 = random.randint(0, 4)
+    num2 = random.randint(0, 4)
+    num3 = random.randint(0, 4)
+    if num1 == num2 and num2 == num3 :
+        slot["value"] = True
+    else :
+        slot["value"] = False
+    label = getCell(num1) + getCell(num2) + getCell(num3)
+    num = str(num1) + str(num2) + str(num3)
+    slot["label"] = label
+    slot["num"] = num
+    return slot
+
 def getRandCard() -> dict:
     d = dict()
     num = random.randint(1, 13)
