@@ -303,10 +303,10 @@ async def _high(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     global g_Cashout
     global g_NextCard
     global g_CardHistory
+    g_CardHistory = g_CardHistory + g_PrevCard['label'] + "\n"
     card = getRandCard()
     print(card)
     if card['value'] > g_PrevCard['value']:
-        g_CardHistory = g_CardHistory + g_PrevCard['label'] + "\n"
         print("High=>TRUE")
         g_Cashout += 1 
         g_NextCard = card
@@ -326,9 +326,9 @@ async def _low(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     global g_NextCard
     global g_CardHistory
     card = getRandCard()
+    g_CardHistory = g_CardHistory + g_PrevCard['label'] + "\n"
     print(card)
     if card['value'] < g_PrevCard['value']:
-        g_CardHistory = g_CardHistory + g_PrevCard['label'] + "\n"
         print("LOW=>TRUE")
         g_NextCard = card
         g_Cashout += 1 
@@ -344,8 +344,9 @@ async def _low(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         )
 
 async def _cashoutHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    await update.message.reply_text(
-        g_Greetings + g_Help + g_Wallet + g_Deposit + g_Withdraw + g_Hilo + g_Slot
+    query = update.callback_query
+    await query.message.edit_text(
+        f"🏆🏆🏆\nYou win!\nProfit : x{g_Cashout}\n/start /hilo"
     )
     
 async def panelSlot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
