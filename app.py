@@ -360,8 +360,15 @@ async def _cashoutHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     )
     
 async def panelSlot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    slot = roll()
+    label = slot["label"]
+    res = ""
+    if slot["value"] == True:
+        res = "Win!"
+    else :
+        res = "Lose!"
     await update.message.reply_text(
-        g_Greetings + g_Help + g_Wallet + g_Deposit + g_Withdraw + g_Hilo + g_Slot
+        f"{label}\nYou {res}/start /slot"
     )
 
 async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
