@@ -80,6 +80,7 @@ g_Unit_ETH = 0.01
 g_Unit_BNB = 0.05
 g_TokenMode = ETH
 g_CurTokenAmount = g_Unit_ETH
+g_SlotCashout = 1.95
 # Enable logging
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
@@ -415,11 +416,12 @@ async def panelSlot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     label = slot["label"]
     res = ""
     if slot["value"] == True:
-        res = "Win!"
+        res = "You Won " + str(g_CurTokenAmount * g_SlotCashout) + getUnitString(g_TokenMode) + "💰"
     else :
-        res = "Lose!"
-    await update.message.reply_text(
-        f"{label}\nYou {res}/start /slot"
+        res = "You Lose " + str(g_CurTokenAmount) + getUnitString(g_TokenMode)
+    query: CallbackQuery = update.callback_query
+    await query.message.edit_text(
+        f"{g_SlotMark}{label}\n\n{res}\n/start /slot"
     )
 
 async def _changeBetAmount(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -436,6 +438,7 @@ async def _changeBetAmount(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         g_CurTokenAmount /= 2
     else :
         g_CurTokenAmount *= 2
+    print(g_CurTokenAmount)
     
     if g_CurTokenAmount < UnitToken :
         g_CurTokenAmount = UnitToken
@@ -543,7 +546,7 @@ def roll() -> dict:
         slot["value"] = True
     else :
         slot["value"] = False
-    label = getCell(num1) + getCell(num2) + getCell(num3)
+    label = getCell(num1) + " | " + getCell(num2) + " | " + getCell(num3)
     num = str(num1) + str(num2) + str(num3)
     slot["label"] = label
     slot["num"] = num
@@ -598,8 +601,8 @@ def main() -> None:
                      CallbackQueryHandler(cancel, pattern="Cancel")],
             LASTSELECT : [CallbackQueryHandler(_changeBetAmount, pattern="^changeBetAmount:"),
                           CallbackQueryHandler(cancel, pattern="Cancel"),
-                          CallbackQueryHandler(_playHilo, pattern="Play"),
-                          CallbackQueryHandler(_playSlot, pattern="Roll")],
+                          CallbackQueryHandler(panelHilo, pattern="Play"),
+                          CallbackQueryHandler(panelSlot, pattern="Roll")],
             PANELHILO: [MessageHandler(filters.TEXT, panelHilo)],
             PANELSLOT: [MessageHandler(filters.TEXT, panelSlot)],
             PANELDEPOSIT: [MessageHandler(filters.TEXT, panelDeposit)],
