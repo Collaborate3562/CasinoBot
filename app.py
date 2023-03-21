@@ -54,7 +54,7 @@ class DateTimeEncoder(JSONEncoder):
     def default(self, obj):
         if isinstance(obj, (datetime.date, datetime.datetime)):
             return obj.isoformat()
-
+g_SlotMark = "🎰 SLOTS 🎰\n\n"
 g_Cashout = 0
 g_Flowers = ['♠️', '♥️', '♣️', '♦️']
 g_Numbers = ['A','2','3','4','5','6','7','8','9','10','J','Q','K']
@@ -164,14 +164,14 @@ async def playSlot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     init()
     global g_STATUS
     g_STATUS = ST_SLOT
-    str_Guide = f"Slot!🌺🌺🌺\nWhich token do you wanna bet?\n"
+    str_Guide = f"{g_SlotMark}Which token do you wanna bet?\n"
     return await eth_bnb_dlg(update, str_Guide)
  
 async def _playSlot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     init()
     global g_STATUS
     g_STATUS = ST_SLOT
-    str_Guide = f"Slot!🌺🌺🌺\nWhich token do you wanna bet?\n"
+    str_Guide = f"{g_SlotMark}Which token do you wanna bet?\n"
     return await _eth_bnb_dlg(update, str_Guide)
  
 async def deposit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -259,11 +259,16 @@ async def confirm_dlg(update: Update, msg : str) -> int:
     query = update.callback_query
     keyboard = [
         [
+            InlineKeyboardButton("/2", callback_data="Decrease"),
             InlineKeyboardButton("Cancel", callback_data="Cancel"),
+            InlineKeyboardButton("x2", callback_data="Increase"),
+        ],
+        [
+            InlineKeyboardButton("Roll", callback_data="Roll"),
         ]
     ]
     await query.message.edit_text(
-        msg,
+        g_SlotMark + msg,
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
     # ForceReply(selective=True) #TODO
