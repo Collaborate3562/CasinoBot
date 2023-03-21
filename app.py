@@ -70,6 +70,8 @@ g_Slot = f"/slot - Play slot casino game\n"
 g_PrevCard = None
 g_NextCard = None
 g_CardHistory = ""
+g_Unit_ETH = 0.01
+g_Unit_BNB = 0.05
 # Enable logging
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
@@ -239,9 +241,10 @@ async def funcETH(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         return await panelDeposit(update, context)
     if g_STATUS == ST_WITHDRAW :
         str_Guide = f"How much do you wanna withdraw?\nCurrent Balance : {n_Balance} ETH\n"
+        return await confirm_dlg_withdraw(update, str_Guide)
     else :
         str_Guide = f"How much do you wanna bet?\nCurrent Balance : {n_Balance} ETH\n"
-    return await confirm_dlg(update, str_Guide)
+        return await confirm_dlg_game(update, str_Guide, g_Unit_ETH, ETH)
  
 async def funcBNB(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     address = await getWallet(UserName)
@@ -251,11 +254,27 @@ async def funcBNB(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         return await panelDeposit(update, context)
     if g_STATUS == ST_WITHDRAW :
         str_Guide = f"How much do you wanna withdraw?\nCurrent Balance : {n_Balance} BNB\n"
+        return await confirm_dlg_withdraw(update, str_Guide)
     else :
         str_Guide = f"How much do you wanna bet?\nCurrent Balance : {n_Balance} BNB\n"
-    return await confirm_dlg(update, str_Guide)
+        return await confirm_dlg_game(update, str_Guide, g_Unit_BNB, BNB)
 
-async def confirm_dlg(update: Update, msg : str) -> int:
+async def confirm_dlg_withdraw(update: Update, msg : str) -> int:
+    query = update.callback_query
+    keyboard = [
+        [
+            InlineKeyboardButton("Cancel", callback_data="Cancel"),
+        ]
+    ]
+    await query.message.edit_text(
+        msg,
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+    # ForceReply(selective=True) #TODO
+    return PANELWITHDRAW
+
+async def confirm_dlg_game(update: Update, msg : str, tokenAmount : int, kind : int) -> int:
+    sAmount = f"\nYou can bet " + getPricefromAmount(tokenAmount, kind)
     query = update.callback_query
     keyboard = [
         [
@@ -268,15 +287,11 @@ async def confirm_dlg(update: Update, msg : str) -> int:
         ]
     ]
     await query.message.edit_text(
-        g_SlotMark + msg,
+        g_SlotMark + msg + sAmount,
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
     # ForceReply(selective=True) #TODO
     match g_STATUS:
-        case 0: #ST_DEPOSIT
-            return PANELDEPOSIT
-        case 1: #ST_WITHDRAW
-            return PANELWITHDRAW
         case 2: #ST_HILO
             return PANELHILO
         case 3: #ST_SLOT
@@ -441,6 +456,14 @@ def init():
     global g_Cashout;       g_Cashout = 0
     global g_NextCard;      g_NextCard = None
     global g_PrevCard;      g_PrevCard = None
+
+def getPricefromAmount(amount : int, kind : int) -> str:
+    str = f"{amount} "
+    if kind == 0 :
+        str += "ETH"
+    else :
+        str += "BNB"
+    return str
 
 async def copyToClipboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query: CallbackQuery = update.callback_query
