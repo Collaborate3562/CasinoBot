@@ -28,7 +28,15 @@ if __version_info__ < (20, 0, 0, "alpha", 5):
         f"{TG_VER} version of this example, "
         f"visit https://docs.python-telegram-bot.org/en/v{TG_VER}/examples.html"
     )
-from telegram import ForceReply, ReplyKeyboardRemove, Update, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
+from telegram import (
+    ForceReply, 
+    ReplyKeyboardRemove, 
+    Update, 
+    InlineKeyboardButton, 
+    InlineKeyboardMarkup, 
+    CallbackQuery
+)
+
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -37,6 +45,8 @@ from telegram.ext import (
     ConversationHandler,
     MessageHandler,
     filters,
+    # Updater,
+    # Dispatcher
 )
 
 from telebot import TeleBot
@@ -55,7 +65,7 @@ class DateTimeEncoder(JSONEncoder):
         if isinstance(obj, (datetime.date, datetime.datetime)):
             return obj.isoformat()
 
-CHOOSE, WALLET, SELECT, STATUS, PAYMENT, DEPOSIT, DISPLAY, COPY, LASTSELECT, PANELHILO, PANELSLOT, BETTINGHILO, PANELDEPOSIT, PANELWITHDRAW = range(14)
+CHOOSE, WALLET, SELECT, STATUS, PAYMENT, DEPOSIT, DISPLAY, COPY, LASTSELECT, PLAYAGAIN, AGAINHOME, PANELHILO, PANELSLOT, BETTINGHILO, PANELDEPOSIT, PANELWITHDRAW = range(16)
 ST_DEPOSIT, ST_WITHDRAW, ST_HILO, ST_SLOT = range(4)
 ETH, BNB = range(2)
 
@@ -90,6 +100,8 @@ logger = logging.getLogger(__name__)
 guestinformation = {}
 g_STATUS = 0
 
+# updater = Updater(token=TOKEN, use_context=True)
+# dispatcher = updater.dispatcher
 def getGame(status):
     sGame = ""
     match status:
@@ -317,12 +329,13 @@ async def confirm_dlg_game(update: Update, msg : str, tokenAmount : int) -> int:
     return LASTSELECT
 
 async def panelHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
     global g_PrevCard
     keyboard = []
     newCard = g_NextCard #For initialize
     sGreeting = ""
     if g_Cashout > 0 :
-        sGreeting = f"You Win!\n{g_CardHistory}Cashout : x{g_Cashout}\n"
+        sGreeting = f"You Won!🎉\nPrevious Cards:{g_CardHistory}\n"
         print(g_NextCard)
         newCard = g_NextCard
         g_PrevCard = newCard
@@ -337,16 +350,13 @@ async def panelHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
                 InlineKeyboardButton("Cashout", callback_data="CashoutHilo"),
             ]
         ]
-        query = update.callback_query
         await query.message.edit_text(
-            f"{sGreeting}Card   :   {str(newCard['label'])}\nWhat is your next guessing? H or L?",
+            f"{sGreeting}Current Card: {str(newCard['label'])}\n\nCashout : x{g_Cashout}\nCashout:" + str(g_CurTokenAmount * g_Cashout) + getUnitString(g_TokenMode) + "\nWhat is your next guess? High or Low?",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
         return BETTINGHILO
     else :
-        betAmount = float(update.message.text)
-        print(betAmount)
-        sGreeting = "Enjoy!\n"
+        sGreeting = "High - Low Game started!\n\n"
         newCard = getRandCard()
         g_PrevCard = newCard
         keyboard = [
@@ -355,8 +365,8 @@ async def panelHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
                 InlineKeyboardButton("Low", callback_data="Low"),
             ]
         ]
-        await update.message.reply_text(
-            f"{sGreeting}Card   :   {str(newCard['label'])}\nWhat is your next guessing? H or L?",
+        await query.message.edit_text(
+            f"{sGreeting}Current Card: {str(newCard['label'])}\nWhat is your next guess? High or Low?",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
         return BETTINGHILO
@@ -365,7 +375,7 @@ async def _high(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     global g_Cashout
     global g_NextCard
     global g_CardHistory
-    g_CardHistory = g_CardHistory + g_PrevCard['label'] + "\n"
+    g_CardHistory = g_CardHistory + g_PrevCard['label'] + " "
     card = getRandCard()
     print(card)
     if card['value'] > g_PrevCard['value']:
@@ -379,16 +389,24 @@ async def _high(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         init()
         g_Cashout = 0
         query = update.callback_query
+        keyboard = [
+            [
+                InlineKeyboardButton("Again", callback_data="again"),
+                InlineKeyboardButton("Home", callback_data="home"),
+            ]
+        ]
         await query.message.edit_text(
-            f"{sCardHistory}😢😢😢\n{card['label']}\nYou Lose!\n/start /hilo"
+            f"Busted!❌\n\nPrevious Cards:{sCardHistory}\n\nFinal Card:{card['label']}\n\n Do you want to play again?",
+            reply_markup=InlineKeyboardMarkup(keyboard)
         )
+        return AGAINHOME
 
 async def _low(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     global g_Cashout
     global g_NextCard
     global g_CardHistory
     card = getRandCard()
-    g_CardHistory = g_CardHistory + g_PrevCard['label'] + "\n"
+    g_CardHistory = g_CardHistory + g_PrevCard['label'] + " "
     print(card)
     if card['value'] < g_PrevCard['value']:
         print("LOW=>TRUE")
@@ -401,9 +419,17 @@ async def _low(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         sCardHistory = g_CardHistory
         init()
         query = update.callback_query
+        keyboard = [
+            [
+                InlineKeyboardButton("Again", callback_data="again"),
+                InlineKeyboardButton("Home", callback_data="home"),
+            ]
+        ]
         await query.message.edit_text(
-            f"{sCardHistory}😢😢😢\n{card['label']}\nYou Lose!\n/start /hilo"
+            f"Busted!❌\n\nPrevious Cards:{sCardHistory}\n\nFinal Card:{card['label']}\n\n Do you want to play again?",
+            reply_markup=InlineKeyboardMarkup(keyboard)
         )
+        return AGAINHOME
 
 async def _cashoutHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
@@ -418,11 +444,20 @@ async def panelSlot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if slot["value"] == True:
         res = "You Won " + str(g_CurTokenAmount * g_SlotCashout) + getUnitString(g_TokenMode) + "💰"
     else :
-        res = "You Lose " + str(g_CurTokenAmount) + getUnitString(g_TokenMode)
+        res = "You Lose " + str(g_CurTokenAmount) + getUnitString(g_TokenMode) + "💸"
     query: CallbackQuery = update.callback_query
+    keyboard = [
+        [
+            InlineKeyboardButton("Play again", callback_data="againSlot"),
+            InlineKeyboardButton("Cancel", callback_data="Cancel"),
+        ]
+    ]
+
     await query.message.edit_text(
-        f"{g_SlotMark}{label}\n\n{res}\n/start /slot"
+        f"{g_SlotMark}{label}\n\n{res}\n",
+        reply_markup=InlineKeyboardMarkup(keyboard)
     )
+    return PLAYAGAIN
 
 async def _changeBetAmount(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query: CallbackQuery = update.callback_query
@@ -493,6 +528,8 @@ async def end(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return ConversationHandler.END
 
 def init():
+    global g_TokenMode; g_TokenMode = ETH
+    global g_CurTokenAmount; g_CurTokenAmount = 0
     global g_CardHistory;   g_CardHistory = ""
     global g_Cashout;       g_Cashout = 0
     global g_NextCard;      g_NextCard = None
@@ -572,6 +609,18 @@ async def getBalance(address : str, token : int) -> float:
             nBalance = 123
     return nBalance
 
+# dispatcher.add_handler(CommandHandler('start', start))
+# def call_start_command() :
+#     update = telegram.Update(
+#         update_id=1,
+#         message=telegram.Message(
+#             message_id=1,
+#             chat=telegram.Chat(id=1, type=telegram.Chat.PRIVATE),
+#             text='/start'
+#         )
+#     )
+#     dispatcher.process_update(update)
+    
 def main() -> None:
     """Run the bot."""
     # Create the Application and pass it your bot's token.
@@ -605,11 +654,15 @@ def main() -> None:
                           CallbackQueryHandler(panelSlot, pattern="Roll")],
             PANELHILO: [MessageHandler(filters.TEXT, panelHilo)],
             PANELSLOT: [MessageHandler(filters.TEXT, panelSlot)],
+            PLAYAGAIN: [CallbackQueryHandler(cancel, pattern="Cancel"),
+                        CallbackQueryHandler(_playSlot, pattern="againSlot"),],
             PANELDEPOSIT: [MessageHandler(filters.TEXT, panelDeposit)],
             PANELWITHDRAW: [MessageHandler(filters.TEXT, panelWithdraw)],
             BETTINGHILO: [CallbackQueryHandler(_cashoutHilo, pattern="CashoutHilo"),
                           CallbackQueryHandler(_high, pattern="High"),
-                          CallbackQueryHandler(_low, pattern="Low"),]
+                          CallbackQueryHandler(_low, pattern="Low"),],
+            AGAINHOME: [CallbackQueryHandler(funcETH, pattern="again"),
+                        CallbackQueryHandler(start, pattern="home")]
         },
         fallbacks=[CommandHandler("end", end)],
         allow_reentry=True,
