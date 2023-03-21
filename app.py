@@ -54,6 +54,11 @@ class DateTimeEncoder(JSONEncoder):
     def default(self, obj):
         if isinstance(obj, (datetime.date, datetime.datetime)):
             return obj.isoformat()
+
+CHOOSE, WALLET, SELECT, STATUS, PAYMENT, DEPOSIT, DISPLAY, COPY, LASTSELECT, PANELHILO, PANELSLOT, BETTINGHILO, PANELDEPOSIT, PANELWITHDRAW = range(14)
+ST_DEPOSIT, ST_WITHDRAW, ST_HILO, ST_SLOT = range(4)
+ETH, BNB = range(2)
+
 g_SlotMark = "🎰 SLOTS 🎰\n\n"
 g_HiloMark = "♠️♥️ HILO ♦️♣️\n\n"
 g_Cashout = 0
@@ -73,15 +78,14 @@ g_NextCard = None
 g_CardHistory = ""
 g_Unit_ETH = 0.01
 g_Unit_BNB = 0.05
+g_TokenMode = ETH
+g_CurTokenAmount = g_Unit_ETH
 # Enable logging
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
-CHOOSE, WALLET, SELECT, STATUS, PAYMENT, DEPOSIT, DISPLAY, COPY, PANELHILO, PANELSLOT, BETTINGHILO, PANELDEPOSIT, PANELWITHDRAW = range(13)
-ST_DEPOSIT, ST_WITHDRAW, ST_HILO, ST_SLOT = range(4)
-ETH, BNB = range(2)
 guestinformation = {}
 g_STATUS = 0
 
@@ -235,8 +239,9 @@ async def _eth_bnb_dlg(update: Update, msg : str) -> int:
     return SELECT
  
 async def funcETH(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    global g_TokenMode; g_TokenMode = ETH
     address = await getWallet(UserName)
-    n_Balance = await getBalance(address, ETH)
+    n_Balance = await getBalance(address, g_TokenMode)
     str_Guide = ""
     if g_STATUS == ST_DEPOSIT:
         return await panelDeposit(update, context)
@@ -245,11 +250,12 @@ async def funcETH(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         return await confirm_dlg_withdraw(update, str_Guide)
     else :
         str_Guide = f"How much do you wanna bet?\nCurrent Balance : {n_Balance} ETH\n"
-        return await confirm_dlg_game(update, str_Guide, g_Unit_ETH, ETH)
+        return await confirm_dlg_game(update, str_Guide, g_Unit_ETH)
  
 async def funcBNB(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    global g_TokenMode; g_TokenMode = BNB
     address = await getWallet(UserName)
-    n_Balance = await getBalance(address, BNB)
+    n_Balance = await getBalance(address, g_TokenMode)
     str_Guide = ""
     if g_STATUS == ST_DEPOSIT:
         return await panelDeposit(update, context)
@@ -258,7 +264,7 @@ async def funcBNB(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         return await confirm_dlg_withdraw(update, str_Guide)
     else :
         str_Guide = f"How much do you wanna bet?\nCurrent Balance : {n_Balance} BNB\n"
-        return await confirm_dlg_game(update, str_Guide, g_Unit_BNB, BNB)
+        return await confirm_dlg_game(update, str_Guide, g_Unit_BNB)
 
 async def confirm_dlg_withdraw(update: Update, msg : str) -> int:
     query = update.callback_query
@@ -274,8 +280,8 @@ async def confirm_dlg_withdraw(update: Update, msg : str) -> int:
     # ForceReply(selective=True) #TODO
     return PANELWITHDRAW
 
-async def confirm_dlg_game(update: Update, msg : str, tokenAmount : int, kind : int) -> int:
-    sAmount = f"\nYou can bet " + getPricefromAmount(tokenAmount, kind)
+async def confirm_dlg_game(update: Update, msg : str, tokenAmount : int) -> int:
+    sAmount = f"\nYou can bet {tokenAmount}" + getUnitString(g_TokenMode) + getPricefromAmount(tokenAmount)
     query = update.callback_query
     
     sPlayButton = ""
@@ -289,9 +295,9 @@ async def confirm_dlg_game(update: Update, msg : str, tokenAmount : int, kind : 
             sMark = g_SlotMark
     keyboard = [
         [
-            InlineKeyboardButton("/2", callback_data="Decrease"),
+            InlineKeyboardButton("/2", callback_data="changeBetAmount:0"),
             InlineKeyboardButton("Cancel", callback_data="Cancel"),
-            InlineKeyboardButton("x2", callback_data="Increase"),
+            InlineKeyboardButton("x2", callback_data="changeBetAmount:1"),
         ],
         [
             InlineKeyboardButton(sPlayButton, callback_data=sPlayButton),
@@ -302,11 +308,12 @@ async def confirm_dlg_game(update: Update, msg : str, tokenAmount : int, kind : 
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
     # ForceReply(selective=True) #TODO
-    match g_STATUS:
-        case 2: #ST_HILO
-            return PANELHILO
-        case 3: #ST_SLOT
-            return PANELSLOT
+    # match g_STATUS:
+    #     case 2: #ST_HILO
+    #         return PANELHILO
+    #     case 3: #ST_SLOT
+    #         return PANELSLOT
+    return LASTSELECT
 
 async def panelHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     global g_PrevCard
@@ -415,6 +422,26 @@ async def panelSlot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         f"{label}\nYou {res}/start /slot"
     )
 
+async def _changeBetAmount(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query: CallbackQuery = update.callback_query
+    # query.answer()
+    param = query.data.split(":")[1]
+    if g_TokenMode == ETH :
+        UnitToken = g_Unit_ETH
+    else :
+        UnitToken = g_Unit_BNB
+    global g_CurTokenAmount
+    print(param)
+    if param == 0 :
+        g_CurTokenAmount /= 2
+    else :
+        g_CurTokenAmount *= 2
+    
+    if g_CurTokenAmount < UnitToken :
+        g_CurTokenAmount = UnitToken
+    str_Guide = f"How much do you wanna bet?\nCurrent Balance : " + str(await getBalance(await getWallet(UserName), g_TokenMode)) + getUnitString(g_TokenMode) + "\n"
+    return await confirm_dlg_game(update, str_Guide, g_CurTokenAmount)
+
 async def panelDeposit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     address = await getWallet(UserName)
     query = update.callback_query
@@ -468,12 +495,20 @@ def init():
     global g_NextCard;      g_NextCard = None
     global g_PrevCard;      g_PrevCard = None
 
-def getPricefromAmount(amount : int, kind : int) -> str:
-    str = f"{amount} "
-    if kind == 0 :
-        str += "ETH"
+def getPricefromAmount(amount : float) -> str:
+    price = 0
+    if g_TokenMode == 0 :
+        price = amount * 1700
     else :
-        str += "BNB"
+        price = amount * 300
+    return f" (${price})"
+
+def getUnitString(kind: int) -> str:
+    str = ""
+    if kind == 0 :
+        str = "ETH"
+    else :
+        str = "BNB"
     return str
 
 async def copyToClipboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -525,7 +560,7 @@ async def getWallet(userName : str) -> str:
     walletAddress = "0x1234567890abcdefghijklmnopqrstuvwxyz987"
     return walletAddress
 
-async def getBalance(address : str, token : int) -> int:
+async def getBalance(address : str, token : int) -> float:
     nBalance = 0
     match token:
         case 0: # ETH
@@ -561,6 +596,10 @@ def main() -> None:
             SELECT: [CallbackQueryHandler(funcETH, pattern="funcETH"),
                      CallbackQueryHandler(funcBNB, pattern="funcBNB"),
                      CallbackQueryHandler(cancel, pattern="Cancel")],
+            LASTSELECT : [CallbackQueryHandler(_changeBetAmount, pattern="^changeBetAmount:"),
+                          CallbackQueryHandler(cancel, pattern="Cancel"),
+                          CallbackQueryHandler(_playHilo, pattern="Play"),
+                          CallbackQueryHandler(_playSlot, pattern="Roll")],
             PANELHILO: [MessageHandler(filters.TEXT, panelHilo)],
             PANELSLOT: [MessageHandler(filters.TEXT, panelSlot)],
             PANELDEPOSIT: [MessageHandler(filters.TEXT, panelDeposit)],
