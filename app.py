@@ -55,6 +55,7 @@ class DateTimeEncoder(JSONEncoder):
         if isinstance(obj, (datetime.date, datetime.datetime)):
             return obj.isoformat()
 g_SlotMark = "🎰 SLOTS 🎰\n\n"
+g_HiloMark = "♠️♥️ HILO ♦️♣️\n\n"
 g_Cashout = 0
 g_Flowers = ['♠️', '♥️', '♣️', '♦️']
 g_Numbers = ['A','2','3','4','5','6','7','8','9','10','J','Q','K']
@@ -152,14 +153,14 @@ async def playHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     init()
     global g_STATUS
     g_STATUS = ST_HILO
-    str_Guide = f"Hilo!🧑‍🤝‍🧑\nWhich token do you wanna bet?\n"
+    str_Guide = f"{g_HiloMark}Which token do you wanna bet?\n"
     return await eth_bnb_dlg(update, str_Guide)
 
 async def _playHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     init()
     global g_STATUS
     g_STATUS = ST_HILO
-    str_Guide = f"Hilo!🧑‍🤝‍🧑\nWhich token do you wanna bet?\n"
+    str_Guide = f"{g_HiloMark}Which token do you wanna bet?\n"
     return await _eth_bnb_dlg(update, str_Guide)
 
 async def playSlot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -276,6 +277,16 @@ async def confirm_dlg_withdraw(update: Update, msg : str) -> int:
 async def confirm_dlg_game(update: Update, msg : str, tokenAmount : int, kind : int) -> int:
     sAmount = f"\nYou can bet " + getPricefromAmount(tokenAmount, kind)
     query = update.callback_query
+    
+    sPlayButton = ""
+    sMark = ""
+    match g_STATUS:
+        case 2: #ST_HILO
+            sPlayButton = "Play"
+            sMark = g_HiloMark
+        case 3: #ST_SLOT
+            sPlayButton = "Roll"
+            sMark = g_SlotMark
     keyboard = [
         [
             InlineKeyboardButton("/2", callback_data="Decrease"),
@@ -283,11 +294,11 @@ async def confirm_dlg_game(update: Update, msg : str, tokenAmount : int, kind : 
             InlineKeyboardButton("x2", callback_data="Increase"),
         ],
         [
-            InlineKeyboardButton("Roll", callback_data="Roll"),
+            InlineKeyboardButton(sPlayButton, callback_data=sPlayButton),
         ]
     ]
     await query.message.edit_text(
-        g_SlotMark + msg + sAmount,
+        sMark + msg + sAmount,
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
     # ForceReply(selective=True) #TODO
