@@ -400,8 +400,9 @@ async def _high(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         query = update.callback_query
         keyboard = [
             [
-                InlineKeyboardButton("Again", callback_data="again"),
-                InlineKeyboardButton("Home", callback_data="home"),
+                InlineKeyboardButton("Play Again", callback_data="againHilo"),
+                InlineKeyboardButton("Change Bet", callback_data="changeBet"),
+                InlineKeyboardButton("Cancel", callback_data="Cancel"),
             ]
         ]
         await query.message.edit_text(
@@ -458,6 +459,7 @@ async def panelSlot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     keyboard = [
         [
             InlineKeyboardButton("Play again", callback_data="againSlot"),
+            InlineKeyboardButton("Change bet", callback_data="changeBet"),
             InlineKeyboardButton("Cancel", callback_data="Cancel"),
         ]
     ]
@@ -478,6 +480,7 @@ async def _changeBetAmount(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         UnitToken = g_Unit_BNB
     global g_CurTokenAmount
     print(param)
+    print(g_CurTokenAmount)
     if param == 0 :
         g_CurTokenAmount /= 2
     else :
@@ -543,7 +546,7 @@ async def end(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 def init():
     global g_TokenMode; g_TokenMode = ETH
-    global g_CurTokenAmount; g_CurTokenAmount = 0
+    global g_CurTokenAmount; g_CurTokenAmount = g_Unit_ETH
     global g_CardHistory;   g_CardHistory = ""
     global g_Cashout;       g_Cashout = 0
     global g_NextCard;      g_NextCard = None
@@ -670,7 +673,8 @@ def main() -> None:
             PANELHILO: [MessageHandler(filters.TEXT, panelHilo)],
             PANELSLOT: [MessageHandler(filters.TEXT, panelSlot)],
             PLAYAGAIN: [CallbackQueryHandler(cancel, pattern="Cancel"),
-                        CallbackQueryHandler(_playSlot, pattern="againSlot"),],
+                        CallbackQueryHandler(_playSlot, pattern="againSlot"),
+                        CallbackQueryHandler(_playSlot, pattern="changeBet"),],
             PANELDEPOSIT: [MessageHandler(filters.TEXT, panelDeposit)],
             PANELWITHDRAW: [MessageHandler(filters.TEXT, panelWithdraw)],
             BETTINGHILO: [CallbackQueryHandler(_cashoutHilo, pattern="CashoutHilo"),
