@@ -65,7 +65,7 @@ class DateTimeEncoder(JSONEncoder):
         if isinstance(obj, (datetime.date, datetime.datetime)):
             return obj.isoformat()
 
-CHOOSE, WALLET, SELECT, STATUS, PAYMENT, DEPOSIT, DISPLAY, COPY, LASTSELECT, PLAYAGAIN, AGAINHOME, PANELHILO, PANELSLOT, BETTINGHILO, PANELDEPOSIT, PANELWITHDRAW = range(16)
+CHOOSE, WALLET, SELECT, STATUS, PAYMENT, DEPOSIT, DISPLAY, COPY, LASTSELECT, AGAINSLOT, AGAINHILO, PANELHILO, PANELSLOT, BETTINGHILO, PANELDEPOSIT, PANELWITHDRAW = range(16)
 ST_DEPOSIT, ST_WITHDRAW, ST_HILO, ST_SLOT = range(4)
 ETH, BNB = range(2)
 
@@ -384,8 +384,12 @@ async def _high(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     global g_Cashout
     global g_NextCard
     global g_CardHistory
+    card = None
+    while True :
+        card = getRandCard()
+        if card['value'] != g_PrevCard['value'] :
+            break
     g_CardHistory = g_CardHistory + g_PrevCard['label'] + " "
-    card = getRandCard()
     print(card)
     if card['value'] > g_PrevCard['value']:
         print("High=>TRUE")
@@ -409,13 +413,17 @@ async def _high(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             f"Busted!❌\n\nPrevious Cards:{sCardHistory}\n\nFinal Card:{card['label']}\n\n Do you want to play again?",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
-        return AGAINHOME
+        return AGAINHILO
 
 async def _low(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     global g_Cashout
     global g_NextCard
     global g_CardHistory
-    card = getRandCard()
+    card = None
+    while True :
+        card = getRandCard()
+        if card['value'] != g_PrevCard['value'] :
+            break
     g_CardHistory = g_CardHistory + g_PrevCard['label'] + " "
     print(card)
     if card['value'] < g_PrevCard['value']:
@@ -431,15 +439,16 @@ async def _low(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         query = update.callback_query
         keyboard = [
             [
-                InlineKeyboardButton("Again", callback_data="again"),
-                InlineKeyboardButton("Home", callback_data="home"),
+                InlineKeyboardButton("Play Again", callback_data="againHilo"),
+                InlineKeyboardButton("Change Bet", callback_data="changeBet"),
+                InlineKeyboardButton("Cancel", callback_data="Cancel"),
             ]
         ]
         await query.message.edit_text(
             f"Busted!❌\n\nPrevious Cards:{sCardHistory}\n\nFinal Card:{card['label']}\n\n Do you want to play again?",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
-        return AGAINHOME
+        return AGAINHILO
 
 async def _cashoutHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
@@ -468,7 +477,7 @@ async def panelSlot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         f"{g_SlotMark}{label}\n\n{res}\n",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
-    return PLAYAGAIN
+    return AGAINSLOT
 
 async def _changeBetAmount(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query: CallbackQuery = update.callback_query
@@ -608,7 +617,11 @@ def roll() -> dict:
 
 def getRandCard() -> dict:
     d = dict()
-    num = random.randint(1, 13)
+    print(g_CardHistory)
+    if g_CardHistory.count == 0 :
+        num = random.randint(2, 12)
+    else :
+        num = random.randint(1, 13)
     d['value'] = num
     d['label'] = random.choice(g_Flowers) + g_Numbers[num-1]
     return d
@@ -672,16 +685,17 @@ def main() -> None:
                           CallbackQueryHandler(panelSlot, pattern="Roll")],
             PANELHILO: [MessageHandler(filters.TEXT, panelHilo)],
             PANELSLOT: [MessageHandler(filters.TEXT, panelSlot)],
-            PLAYAGAIN: [CallbackQueryHandler(cancel, pattern="Cancel"),
+            AGAINSLOT: [CallbackQueryHandler(cancel, pattern="Cancel"),
                         CallbackQueryHandler(_playSlot, pattern="againSlot"),
                         CallbackQueryHandler(_playSlot, pattern="changeBet"),],
+            AGAINHILO: [CallbackQueryHandler(cancel, pattern="Cancel"),
+                        CallbackQueryHandler(_playHilo, pattern="againHilo"),
+                        CallbackQueryHandler(_playHilo, pattern="changeBet")],
             PANELDEPOSIT: [MessageHandler(filters.TEXT, panelDeposit)],
             PANELWITHDRAW: [MessageHandler(filters.TEXT, panelWithdraw)],
             BETTINGHILO: [CallbackQueryHandler(_cashoutHilo, pattern="CashoutHilo"),
                           CallbackQueryHandler(_high, pattern="High"),
-                          CallbackQueryHandler(_low, pattern="Low"),],
-            AGAINHOME: [CallbackQueryHandler(funcETH, pattern="again"),
-                        CallbackQueryHandler(start, pattern="home")]
+                          CallbackQueryHandler(_low, pattern="Low"),]
         },
         fallbacks=[CommandHandler("end", end)],
         allow_reentry=True,
