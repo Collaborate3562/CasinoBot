@@ -83,6 +83,7 @@ g_Deposit = f"/deposit - Deposit ETH or BNB into your wallet\n"
 g_Withdraw = f"/withdraw - Withdraw ETH or BNB from your wallet\n"
 g_Hilo = f"/hilo - Play hilo casino game\n"
 g_Slot = f"/slot - Play slot casino game\n"
+g_LeaderBoard = f"/board - Show the leaderboard\n"
 g_PrevCard = None
 g_NextCard = None
 g_CardHistory = ""
@@ -150,6 +151,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return CHOOSE
 
 async def wallet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    userInfo = update.message.from_user
+    print('{} is checking wallet, his user ID: {} '.format(userInfo['username'], userInfo['id']))
     address = await getWallet(UserName)
     eth_amount = await getBalance(address, ETH)
     bnb_amount = await getBalance(address, BNB)
@@ -167,6 +170,8 @@ async def _wallet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     )
 
 async def playHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    userInfo = update.message.from_user
+    print('{} starts Hilo, his user ID: {} '.format(userInfo['username'], userInfo['id']))
     init()
     global g_STATUS
     g_STATUS = ST_HILO
@@ -181,6 +186,8 @@ async def _playHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return await _eth_bnb_dlg(update, str_Guide)
 
 async def playSlot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    userInfo = update.message.from_user
+    print('{} starts SLOT, his user ID: {} '.format(userInfo['username'], userInfo['id']))
     init()
     global g_STATUS
     g_STATUS = ST_SLOT
@@ -207,6 +214,8 @@ async def _deposit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return await _eth_bnb_dlg(update, str_Guide)
 
 async def withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    userInfo = update.message.from_user
+    print('{} tries to withdraw, his user ID: {} '.format(userInfo['username'], userInfo['id']))
     global g_STATUS
     g_STATUS = ST_WITHDRAW
     str_Guide = f"💰 Please select token to withdraw\n"
@@ -444,7 +453,7 @@ async def panelSlot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if slot["value"] == True:
         res = "You Won " + str(g_CurTokenAmount * g_SlotCashout) + getUnitString(g_TokenMode) + "💰"
     else :
-        res = "You Lose " + str(g_CurTokenAmount) + getUnitString(g_TokenMode) + "💸"
+        res = "You lost " + str(g_CurTokenAmount) + " " + getUnitString(g_TokenMode) + "💸"
     query: CallbackQuery = update.callback_query
     keyboard = [
         [
@@ -502,13 +511,18 @@ async def panelWithdraw(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 
 async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     await update.message.reply_text(
-        g_Greetings + g_Help + g_Wallet + g_Deposit + g_Withdraw + g_Hilo + g_Slot
+        g_Greetings + g_Help + g_Wallet + g_Deposit + g_Withdraw + g_Hilo + g_Slot + g_LeaderBoard
     )
  
 async def _help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.message.edit_text(
-        g_Greetings + g_Help + g_Wallet + g_Deposit + g_Withdraw + g_Hilo + g_Slot
+        g_Greetings + g_Help + g_Wallet + g_Deposit + g_Withdraw + g_Hilo + g_Slot + g_LeaderBoard
+    )
+
+async def board(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await update.message.reply_text(
+        "Shows the order of the users who had won\n1. Thomas $999\n2. Thomas $999\n3. Thomas $999"
     )
  
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -634,6 +648,7 @@ def main() -> None:
                       CommandHandler("hilo", playHilo),
                       CommandHandler("slot", playSlot),
                       CommandHandler("withdraw", withdraw),
+                      CommandHandler("board", board),
                       CommandHandler("deposit", deposit)],
         states={
             WALLET: [MessageHandler("wallet", wallet)],
