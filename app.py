@@ -456,7 +456,6 @@ async def funcBNB(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def confirm_dlg_game(update: Update, context: ContextTypes.DEFAULT_TYPE, msg : str, tokenAmount : float) -> int:
     sAmount = f"\nYou can bet {tokenAmount}" + getUnitString(g_TokenMode) + getPricefromAmount(tokenAmount)
     query = update.callback_query
-    print("debug 2")
     
     sPlayButton = ""
     sMark = ""
@@ -467,7 +466,6 @@ async def confirm_dlg_game(update: Update, context: ContextTypes.DEFAULT_TYPE, m
         case 3: #ST_SLOT
             sPlayButton = "Roll"
             sMark = g_SlotMark
-    print("debug 3")
 
     keyboard = [
         [
@@ -486,7 +484,6 @@ async def confirm_dlg_game(update: Update, context: ContextTypes.DEFAULT_TYPE, m
         )
     except Exception as e:
         print("Error",e)
-    print("debug 4")
 
     return LASTSELECT
 
@@ -503,12 +500,12 @@ async def _changeBetAmount(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         UnitToken = g_Unit_BNB
     global g_CurTokenAmount
     print(param)
-    print(g_CurTokenAmount)
-    if param == 0 :
-        g_CurTokenAmount = g_CurTokenAmount / 2
+    if int(param) == 0 :
+        print(g_CurTokenAmount)
+        g_CurTokenAmount /= 2
+        print(g_CurTokenAmount)
     else :
         g_CurTokenAmount *= 2
-    print(g_CurTokenAmount)
     
     if g_CurTokenAmount < UnitToken :
         g_CurTokenAmount = UnitToken
@@ -683,7 +680,6 @@ def controlRandCard(high : bool) -> dict:
 def getRandCard() -> dict:
     d = dict()
     random.seed(random.randint(1, 1000))
-    print(g_CardHistory)
     if len(g_CardHistory) == 0 :
         num = random.randint(4, 10)
     else :
