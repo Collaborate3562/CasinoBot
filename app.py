@@ -230,7 +230,7 @@ async def _high(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     while True :
         card = controlRandCard(True)
         # card = getRandCard()
-        if card['value'] != g_PrevCard['value'] :
+        if card['value'] != g_PrevCard['value'] and card['label'] not in g_CardHistory:
             break
     g_CardHistory = g_CardHistory + g_PrevCard['label'] + " "
     print(card)
@@ -266,7 +266,7 @@ async def _low(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     while True :
         card = controlRandCard(False)
         # card = getRandCard()
-        if card['value'] != g_PrevCard['value'] :
+        if g_PrevCard != None and card['value'] != g_PrevCard['value'] :
             break
     g_CardHistory = g_CardHistory + g_PrevCard['label'] + " "
     if card['value'] < g_PrevCard['value']:
@@ -504,7 +504,7 @@ async def _changeBetAmount(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     
     if g_CurTokenAmount < UnitToken :
         g_CurTokenAmount = UnitToken
-    str_Guide = f"How much do you wanna bet?\nCurrent Balance : " + str(await getBalance(await getWallet(UserName), g_TokenMode)) + getUnitString(g_TokenMode) + "\n"
+    str_Guide = f"How much do you wanna bet?\nCurrent Balance : " + str(await getBalance(await getWallet(UserName), g_TokenMode)) + " " + getUnitString(g_TokenMode) + "\n"
     return await confirm_dlg_game(update, str_Guide, g_CurTokenAmount)
 
 async def panelDeposit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -632,8 +632,10 @@ def controlRandCard(high : bool) -> dict:
         random.seed(random.randint(1000, 2000))
         num = random.randint(1, 1000)
         print(num)
-        # if num > 775 and num < 225 :
-        if num > 500 :
+        # if num > 750 and num < 250:
+        limit = 700 * random.uniform(0.9, 1.1)
+        print(limit)
+        if num > limit:
             if high == True :
                 while True :
                     loop += 1
