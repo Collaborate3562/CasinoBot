@@ -437,7 +437,7 @@ async def funcETH(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         return await confirm_dlg_withdraw(update, str_Guide)
     else :
         str_Guide = f"How much do you wanna bet?\nCurrent Balance : {n_Balance} ETH\n"
-        return await confirm_dlg_game(update, str_Guide, g_Unit_ETH)
+        return await confirm_dlg_game(update, context, str_Guide, g_Unit_ETH)
  
 async def funcBNB(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     global g_TokenMode; g_TokenMode = BNB
@@ -451,11 +451,12 @@ async def funcBNB(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         return await confirm_dlg_withdraw(update, str_Guide)
     else :
         str_Guide = f"How much do you wanna bet?\nCurrent Balance : {n_Balance} BNB\n"
-        return await confirm_dlg_game(update, str_Guide, g_Unit_BNB)
+        return await confirm_dlg_game(update, context, str_Guide, g_Unit_BNB)
 
-async def confirm_dlg_game(update: Update, msg : str, tokenAmount : int) -> int:
+async def confirm_dlg_game(update: Update, context: ContextTypes.DEFAULT_TYPE, msg : str, tokenAmount : float) -> int:
     sAmount = f"\nYou can bet {tokenAmount}" + getUnitString(g_TokenMode) + getPricefromAmount(tokenAmount)
     query = update.callback_query
+    print("debug 2")
     
     sPlayButton = ""
     sMark = ""
@@ -466,6 +467,8 @@ async def confirm_dlg_game(update: Update, msg : str, tokenAmount : int) -> int:
         case 3: #ST_SLOT
             sPlayButton = "Roll"
             sMark = g_SlotMark
+    print("debug 3")
+
     keyboard = [
         [
             InlineKeyboardButton("/2", callback_data="changeBetAmount:0"),
@@ -476,10 +479,15 @@ async def confirm_dlg_game(update: Update, msg : str, tokenAmount : int) -> int:
             InlineKeyboardButton(sPlayButton, callback_data=sPlayButton),
         ]
     ]
-    await query.message.edit_text(
-        sMark + msg + sAmount,
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    try:
+        await query.message.edit_text(
+            sMark + msg + sAmount,
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    except Exception as e:
+        print("Error",e)
+    print("debug 4")
+
     return LASTSELECT
 
 ########################################################################
@@ -497,7 +505,7 @@ async def _changeBetAmount(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     print(param)
     print(g_CurTokenAmount)
     if param == 0 :
-        g_CurTokenAmount /= 2
+        g_CurTokenAmount = g_CurTokenAmount / 2
     else :
         g_CurTokenAmount *= 2
     print(g_CurTokenAmount)
@@ -505,7 +513,8 @@ async def _changeBetAmount(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     if g_CurTokenAmount < UnitToken :
         g_CurTokenAmount = UnitToken
     str_Guide = f"How much do you wanna bet?\nCurrent Balance : " + str(await getBalance(await getWallet(UserName), g_TokenMode)) + " " + getUnitString(g_TokenMode) + "\n"
-    return await confirm_dlg_game(update, str_Guide, g_CurTokenAmount)
+    print("debug 1")
+    return await confirm_dlg_game(update, context, str_Guide, g_CurTokenAmount)
 
 async def panelDeposit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     address = await getWallet(UserName)
