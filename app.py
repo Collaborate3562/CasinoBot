@@ -15,6 +15,7 @@ import json
 import logging
 import random
 import pyperclip
+import threading
 from telegram import __version__ as TG_VER
 
 try:
@@ -701,6 +702,17 @@ async def getBalance(address : str, token : int) -> float:
             nBalance = 123
     return nBalance
 
+def funcInterval():
+    print("***********************************")
+
+def setInterval(func, sec):
+    def func_wrapper():
+        setInterval(func, sec)
+        func()
+    t = threading.Timer(sec, func_wrapper)
+    t.start()
+    return t
+
 # dispatcher.add_handler(CommandHandler('start', start))
 # def call_start_command() :
 #     update = telegram.Update(
@@ -715,6 +727,8 @@ async def getBalance(address : str, token : int) -> float:
     
 def main() -> None:
     """Run the bot."""
+    setInterval(funcInterval, 5)
+
     # Create the Application and pass it your bot's token.
     application = Application.builder().token(TOKEN).build()
 
@@ -768,7 +782,5 @@ def main() -> None:
     # Run the bot until the user presses Ctrl-C
     application.run_polling()
 
-
 if __name__ == "__main__":
     main()
-
