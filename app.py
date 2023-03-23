@@ -455,7 +455,7 @@ async def funcBNB(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         return await confirm_dlg_game(update, context, str_Guide, g_Unit_BNB)
 
 async def confirm_dlg_game(update: Update, context: ContextTypes.DEFAULT_TYPE, msg : str, tokenAmount : float) -> int:
-    sAmount = f"\nYou can bet {tokenAmount}" + getUnitString(g_TokenMode) + getPricefromAmount(tokenAmount)
+    sAmount = f"\nYou can bet {tokenAmount}" + getUnitString(g_TokenMode) + await getPricefromAmount(tokenAmount)
     query = update.callback_query
     
     sPlayButton = ""
@@ -574,7 +574,10 @@ def init():
     global g_NextCard;      g_NextCard = None
     global g_PrevCard;      g_PrevCard = None
 
-def getPricefromAmount(amount : float) -> str:
+############################################################################
+#                               Incomplete                                 #
+############################################################################
+async def getPricefromAmount(amount : float) -> str:
     price = 0
     if g_TokenMode == 0 :
         price = amount * 1700
@@ -582,13 +585,21 @@ def getPricefromAmount(amount : float) -> str:
         price = amount * 300
     return f" (${price})"
 
-def getUnitString(kind: int) -> str:
-    str = ""
-    if kind == 0 :
-        str = "ETH"
-    else :
-        str = "BNB"
-    return str
+async def getWallet(userName : str) -> str:
+    walletAddress = "0x1234567890abcdefghijklmnopqrstuvwxyz987"
+    return walletAddress
+
+async def getBalance(address : str, token : int) -> float:
+    nBalance = 0
+    match token:
+        case 0: # ETH
+            nBalance = 456
+        case 1: # BNB
+            nBalance = 123
+    return nBalance
+
+def funcInterval() -> None:
+    return
 
 async def copyToClipboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query: CallbackQuery = update.callback_query
@@ -598,6 +609,9 @@ async def copyToClipboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     print(param)
     pyperclip.paste()
 
+############################################################################
+#                       complete(1st edition)                              #
+############################################################################
 def getCell(num : int) -> str:
     cell = ""
     match num:
@@ -627,6 +641,14 @@ def roll() -> dict:
     slot["label"] = label
     slot["num"] = num
     return slot
+
+def getUnitString(kind: int) -> str:
+    str = ""
+    if kind == 0 :
+        str = "ETH"
+    else :
+        str = "BNB"
+    return str
 
 def controlRandCard(high : bool) -> dict:
     card = None
@@ -689,23 +711,7 @@ def getRandCard() -> dict:
     d['label'] = random.choice(g_Flowers) + g_Numbers[num-1]
     return d
 
-async def getWallet(userName : str) -> str:
-    walletAddress = "0x1234567890abcdefghijklmnopqrstuvwxyz987"
-    return walletAddress
-
-async def getBalance(address : str, token : int) -> float:
-    nBalance = 0
-    match token:
-        case 0: # ETH
-            nBalance = 456
-        case 1: # BNB
-            nBalance = 123
-    return nBalance
-
-def funcInterval():
-    print("***********************************")
-
-def setInterval(func, sec):
+def setInterval(func:any , sec:int) -> any:
     def func_wrapper():
         setInterval(func, sec)
         func()
