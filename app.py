@@ -60,6 +60,12 @@ from libs.util import (
     getUnitString,
     controlRandCard
 )
+
+from libs.db import (
+    updateSetStrWhereStr,
+    updateSetFloatWhereStr,
+    readFieldsWhereStr
+)
 # import mysql.connector
 
 # db = mysql.connector.connect(host="localhost", user="root", passwd="bluesky0812", database="DB_AleekkCasino")
@@ -631,7 +637,9 @@ def setInterval(func:any , sec:int) -> any:
 def main() -> None:
     """Run the bot."""
     setInterval(funcInterval, 5)
-
+    updateSetStrWhereStr("tbl_Users", "Wallet", "0x999999", "RealName", "Thomas")
+    updateSetFloatWhereStr("tbl_Users", "Wagered", 999, "RealName", "Thomas")
+    readFieldsWhereStr("tbl_Users", "Wallet", "ETH_Amount > 20")
     # Create the Application and pass it your bot's token.
     application = Application.builder().token(TOKEN).build()
 
