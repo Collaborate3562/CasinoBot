@@ -55,6 +55,7 @@ from telegram.ext import (
 from telegram_bot_calendar import DetailedTelegramCalendar, LSTEP
 
 from libs.util import (
+    #from util.py
     getPricefromAmount,
     roll,
     getUnitString,
@@ -62,6 +63,7 @@ from libs.util import (
     getWallet,
     getBalance,
     
+    #from db.py
     updateSetStrWhereStr,
     updateSetFloatWhereStr,
     readFieldsWhereStr
@@ -104,15 +106,14 @@ g_Unit_BNB = 0.05
 g_TokenMode = ETH
 g_CurTokenAmount = g_Unit_ETH
 g_SlotCashout = 1.95
+g_STATUS = 0
 # Enable logging
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
-guestinformation = {}
-g_STATUS = 0
-g_Chat_ID = -1
+# g_Chat_ID = -1
 # updater = Updater(token=TOKEN, use_context=True)
 # dispatcher = updater.dispatcher
 
@@ -123,7 +124,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     await readFieldsWhereStr("tbl_Users", "Wallet", "ETH_Amount > 20")
 
     init()
-    global g_Chat_ID; g_Chat_ID = update.message.chat_id
+    # global g_Chat_ID; g_Chat_ID = update.message.chat_id
     user = update.effective_user
     userInfo = update.message.from_user
     global UserName
@@ -131,9 +132,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     str_Greetings = f"🙋‍♀️Hi @{UserName}\nWelcome to Aleekk Casino!\n"
     str_Intro = f"Please enjoy High-Low & Slot machine games here.\n"
     print('You talk with user {} and his user ID: {} '.format(userInfo['username'], userInfo['id']))
-    # guestinformation = {}
-    if context.user_data.get("adjustID"):
-        context.user_data["adjustID"]=""
+    # if context.user_data.get("adjustID"):
+    #     context.user_data["adjustID"]=""
     keyboard = [
         [
             InlineKeyboardButton("Deposit", callback_data="Deposit"),
