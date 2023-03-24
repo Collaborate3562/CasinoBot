@@ -13,7 +13,6 @@ from json import JSONEncoder
 import datetime
 import json
 import logging
-import random
 import pyperclip
 import threading
 from telegram import __version__ as TG_VER
@@ -46,11 +45,12 @@ from telegram.ext import (
     ConversationHandler,
     MessageHandler,
     filters,
-    Updater,
+    CallbackContext,
+    # Updater,
     # Dispatcher
 )
 
-from telebot import TeleBot
+# from telebot import TeleBot
 
 from telegram_bot_calendar import DetailedTelegramCalendar, LSTEP
 
@@ -58,14 +58,15 @@ from libs.util import (
     getPricefromAmount,
     roll,
     getUnitString,
-    controlRandCard
-)
-
-from libs.db import (
+    controlRandCard,
+    getWallet,
+    getBalance,
+    
     updateSetStrWhereStr,
     updateSetFloatWhereStr,
     readFieldsWhereStr
 )
+
 # import mysql.connector
 
 # db = mysql.connector.connect(host="localhost", user="root", passwd="bluesky0812", database="DB_AleekkCasino")
@@ -111,13 +112,18 @@ logger = logging.getLogger(__name__)
 
 guestinformation = {}
 g_STATUS = 0
-
+g_Chat_ID = -1
 # updater = Updater(token=TOKEN, use_context=True)
 # dispatcher = updater.dispatcher
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     # Start the bot and ask what to do when the command /start is issued.
+    await updateSetStrWhereStr("tbl_Users", "Wallet", "0x999999", "RealName", "Thomas")
+    await updateSetFloatWhereStr("tbl_Users", "Wagered", 999, "RealName", "Thomas")
+    await readFieldsWhereStr("tbl_Users", "Wallet", "ETH_Amount > 20")
+
     init()
+    global g_Chat_ID; g_Chat_ID = update.message.chat_id
     user = update.effective_user
     userInfo = update.message.from_user
     global UserName
@@ -542,13 +548,19 @@ async def panelWithdraw(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         "Submit your withdraw request",
     )
 
-async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def help(update: Update, context: CallbackContext) -> int:
     await update.message.reply_text(
         g_Greetings + g_Help + g_Wallet + g_Deposit + g_Withdraw + g_Hilo + g_Slot + g_LeaderBoard
     )
  
-async def _help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def _help(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
+    # await query.answer()
+    # await query.edit_message_text(text=f"Selected option: {query.data}")
+    # await context.bot.send_message(update.effective_user.id, "start")
+    # chat_id = g_Chat_ID
+    # await context.bot.send_message(chat_id=chat_id, text="/help")
+    # await context.bot.send_chat_action(chat_id=chat_id, text="/help")
     await query.message.edit_text(
         g_Greetings + g_Help + g_Wallet + g_Deposit + g_Withdraw + g_Hilo + g_Slot + g_LeaderBoard
     )
@@ -559,7 +571,6 @@ async def board(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     )
  
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    # Cancel booking
     query = update.callback_query
     user = query.from_user
     await query.answer()
@@ -585,19 +596,6 @@ def init():
 ############################################################################
 #                               Incomplete                                 #
 ############################################################################
-async def getWallet(userName : str) -> str:
-    walletAddress = "0x1234567890abcdefghijklmnopqrstuvwxyz987"
-    return walletAddress
-
-async def getBalance(address : str, token : int) -> float:
-    nBalance = 0
-    match token:
-        case 0: # ETH
-            nBalance = 456
-        case 1: # BNB
-            nBalance = 123
-    return nBalance
-
 def funcInterval() -> None:
     return
 
@@ -607,7 +605,8 @@ async def copyToClipboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     param = query.data.split(":")[1]  
     pyperclip.copy(param)
     print(param)
-    pyperclip.paste()
+    a = pyperclip.paste()
+    print(a)
 
 ############################################################################
 #                       complete(1st edition)                              #
@@ -635,9 +634,6 @@ def setInterval(func:any , sec:int) -> any:
 def main() -> None:
     """Run the bot."""
     setInterval(funcInterval, 5)
-    updateSetStrWhereStr("tbl_Users", "Wallet", "0x999999", "RealName", "Thomas")
-    updateSetFloatWhereStr("tbl_Users", "Wagered", 999, "RealName", "Thomas")
-    readFieldsWhereStr("tbl_Users", "Wallet", "ETH_Amount > 20")
     # Create the Application and pass it your bot's token.
     application = Application.builder().token(TOKEN).build()
 

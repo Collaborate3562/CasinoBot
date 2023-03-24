@@ -1,5 +1,11 @@
 import random
 
+from libs.db import (
+    updateSetStrWhereStr,
+    updateSetFloatWhereStr,
+    readFieldsWhereStr
+)
+
 g_Flowers = ['♠️', '♥️', '♣️', '♦️']
 g_Numbers = ['A','2','3','4','5','6','7','8','9','10','J','Q','K']
 
@@ -83,6 +89,19 @@ def controlRandCard(high : bool, CardHistory : str, PrevCard : dict) -> dict:
                     if loop > 10 :
                         break
     return card
+
+async def getWallet(userName : str) -> str:
+    walletAddress = "0x1234567890abcdefghijklmnopqrstuvwxyz987"
+    return walletAddress
+
+async def getBalance(address : str, token : int) -> float:
+    nBalance = 0
+    match token:
+        case 0: # ETH
+            nBalance = 456
+        case 1: # BNB
+            nBalance = 123
+    return nBalance
 
 def _getRandCard(CardHistory : str) -> dict:
     d = dict()
