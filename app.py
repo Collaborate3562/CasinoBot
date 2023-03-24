@@ -46,7 +46,7 @@ from telegram.ext import (
     ConversationHandler,
     MessageHandler,
     filters,
-    # Updater,
+    Updater,
     # Dispatcher
 )
 
@@ -54,17 +54,23 @@ from telebot import TeleBot
 
 from telegram_bot_calendar import DetailedTelegramCalendar, LSTEP
 
-import mysql.connector
+from libs.util import (
+    getPricefromAmount,
+    roll,
+    getUnitString,
+    controlRandCard
+)
+# import mysql.connector
 
-db = mysql.connector.connect(host="localhost", user="root", passwd="bluesky0812", database="DB_AleekkCasino")
+# db = mysql.connector.connect(host="localhost", user="root", passwd="bluesky0812", database="DB_AleekkCasino")
 
-cur = db.cursor()
+# cur = db.cursor()
 
 
-class DateTimeEncoder(JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, (datetime.date, datetime.datetime)):
-            return obj.isoformat()
+# class DateTimeEncoder(JSONEncoder):
+#     def default(self, obj):
+#         if isinstance(obj, (datetime.date, datetime.datetime)):
+#             return obj.isoformat()
 
 CHOOSE, WALLET, SELECT, STATUS, PAYMENT, DEPOSIT, DISPLAY, COPY, LASTSELECT, AGAINSLOT, AGAINHILO, PANELHILO, PANELSLOT, BETTINGHILO, PANELDEPOSIT, PANELWITHDRAW = range(16)
 ST_DEPOSIT, ST_WITHDRAW, ST_HILO, ST_SLOT = range(4)
@@ -73,8 +79,6 @@ ETH, BNB = range(2)
 g_SlotMark = "🎰 SLOTS 🎰\n\n"
 g_HiloMark = "♠️♥️ HILO ♦️♣️\n\n"
 g_Cashout = 0
-g_Flowers = ['♠️', '♥️', '♣️', '♦️']
-g_Numbers = ['A','2','3','4','5','6','7','8','9','10','J','Q','K']
 UserName = ""
 TOKEN = "6282215563:AAFiWA4Owjxl0n9gfelo2jejlYScz7-UeJI"
 g_Greetings = f"/start - Enter the casino\n"
@@ -209,7 +213,7 @@ async def _panelHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         return BETTINGHILO
     else :
         sGreeting = "High - Low Game started!\n\n"
-        newCard = controlRandCard(True)
+        newCard = controlRandCard(True, g_CardHistory, g_PrevCard)
         g_PrevCard = newCard
         keyboard = [
             [
@@ -229,7 +233,7 @@ async def _high(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     global g_CardHistory
     card = None
     while True :
-        card = controlRandCard(True)
+        card = controlRandCard(True, g_CardHistory, g_PrevCard)
         # card = getRandCard()
         if card['value'] != g_PrevCard['value'] and card['label'] not in g_CardHistory:
             break
@@ -265,8 +269,8 @@ async def _low(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     global g_CardHistory
     card = None
     while True :
-        card = controlRandCard(False)
-        # card = getRandCard()
+        card = controlRandCard(False, g_CardHistory, g_PrevCard)
+        # card = getRandCard(g_CardHistory)
         if g_PrevCard != None and card['value'] != g_PrevCard['value'] :
             break
     g_CardHistory = g_CardHistory + g_PrevCard['label'] + " "
@@ -455,7 +459,7 @@ async def funcBNB(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         return await confirm_dlg_game(update, context, str_Guide, g_Unit_BNB)
 
 async def confirm_dlg_game(update: Update, context: ContextTypes.DEFAULT_TYPE, msg : str, tokenAmount : float) -> int:
-    sAmount = f"\nYou can bet {tokenAmount}" + getUnitString(g_TokenMode) + await getPricefromAmount(tokenAmount)
+    sAmount = f"\nYou can bet {tokenAmount}" + getUnitString(g_TokenMode) + await getPricefromAmount(tokenAmount, g_TokenMode)
     query = update.callback_query
     
     sPlayButton = ""
@@ -577,14 +581,6 @@ def init():
 ############################################################################
 #                               Incomplete                                 #
 ############################################################################
-async def getPricefromAmount(amount : float) -> str:
-    price = 0
-    if g_TokenMode == 0 :
-        price = amount * 1700
-    else :
-        price = amount * 300
-    return f" (${price})"
-
 async def getWallet(userName : str) -> str:
     walletAddress = "0x1234567890abcdefghijklmnopqrstuvwxyz987"
     return walletAddress
@@ -612,104 +608,6 @@ async def copyToClipboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
 ############################################################################
 #                       complete(1st edition)                              #
 ############################################################################
-def getCell(num : int) -> str:
-    cell = ""
-    match num:
-        case 0:
-            cell="🍉"
-        case 1:
-            cell="🍎"
-        case 2:
-            cell="🍌"
-        case 3:
-            cell="7️⃣"
-        case 4:
-            cell="🌺"
-    return cell
-
-def roll() -> dict:
-    slot = dict()
-    num1 = random.randint(0, 4)
-    num2 = random.randint(0, 4)
-    num3 = random.randint(0, 4)
-    if num1 == num2 and num2 == num3 :
-        slot["value"] = True
-    else :
-        slot["value"] = False
-    label = getCell(num1) + " | " + getCell(num2) + " | " + getCell(num3)
-    num = str(num1) + str(num2) + str(num3)
-    slot["label"] = label
-    slot["num"] = num
-    return slot
-
-def getUnitString(kind: int) -> str:
-    str = ""
-    if kind == 0 :
-        str = "ETH"
-    else :
-        str = "BNB"
-    return str
-
-def controlRandCard(high : bool) -> dict:
-    card = None
-    loop = 0
-    if g_PrevCard == None or g_PrevCard['value'] == 1 or g_PrevCard['value'] == 13:
-        print("Starting control")
-        card = getRandCard()
-    else :
-        print("controlling")
-        random.seed(random.randint(1000, 2000))
-        num = random.randint(1, 1000)
-        print(num)
-        # if num > 750 and num < 250:
-        limit = 700 * random.uniform(0.9, 1.1)
-        print(limit)
-        if num > limit:
-            if high == True :
-                while True :
-                    loop += 1
-                    card = getRandCard()
-                    if card['value'] > g_PrevCard['value'] :
-                        break
-                    if loop > 10 :
-                        break
-            else :
-                while True :
-                    loop += 1
-                    card = getRandCard()
-                    if card['value'] < g_PrevCard['value'] :
-                        break
-                    if loop > 10 :
-                        break
-        else : 
-            if high == True :
-                while True :
-                    loop += 1
-                    card = getRandCard()
-                    if card['value'] < g_PrevCard['value'] :
-                        break
-                    if loop > 10 :
-                        break
-            else :
-                while True :
-                    loop += 1
-                    card = getRandCard()
-                    if card['value'] > g_PrevCard['value'] :
-                        break
-                    if loop > 10 :
-                        break
-    return card
-
-def getRandCard() -> dict:
-    d = dict()
-    random.seed(random.randint(1, 1000))
-    if len(g_CardHistory) == 0 :
-        num = random.randint(4, 10)
-    else :
-        num = random.randint(1, 13)
-    d['value'] = num
-    d['label'] = random.choice(g_Flowers) + g_Numbers[num-1]
-    return d
 
 def setInterval(func:any , sec:int) -> any:
     def func_wrapper():
@@ -729,8 +627,7 @@ def setInterval(func:any , sec:int) -> any:
 #             text='/start'
 #         )
 #     )
-#     dispatcher.process_update(update)
-    
+#     dispatcher.process_update(update)     
 def main() -> None:
     """Run the bot."""
     setInterval(funcInterval, 5)

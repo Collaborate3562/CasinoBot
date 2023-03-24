@@ -11,6 +11,3 @@ def table():
         print("Tables created sucessfully")
     except:
         print("tables error1")
-
-table()
-
