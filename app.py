@@ -240,7 +240,6 @@ async def _high(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     card = None
     while True :
         card = controlRandCard(True, g_CardHistory, g_PrevCard)
-        # card = getRandCard()
         if card['value'] != g_PrevCard['value'] and card['label'] not in g_CardHistory:
             break
     g_CardHistory = g_CardHistory + g_PrevCard['label'] + " "
@@ -276,7 +275,6 @@ async def _low(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     card = None
     while True :
         card = controlRandCard(False, g_CardHistory, g_PrevCard)
-        # card = getRandCard(g_CardHistory)
         if g_PrevCard != None and card['value'] != g_PrevCard['value'] :
             break
     g_CardHistory = g_CardHistory + g_PrevCard['label'] + " "
