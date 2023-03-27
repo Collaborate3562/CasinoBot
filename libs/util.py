@@ -119,13 +119,9 @@ async def getWallet(userId: str, userName: str, fullName: str, isBot: bool, ethC
 
     return wallet[0][0]
 
-async def getBalance(address : str, token : int) -> float:
+async def getBalance(address: str, web3: any) -> float:
     nBalance = 0
-    match token:
-        case 0: # ETH
-            nBalance = 456
-        case 1: # BNB
-            nBalance = 123
+    nBalance = web3.eth.getBalance(address)
     return nBalance
 
 def _getRandCard(CardHistory : str) -> dict:

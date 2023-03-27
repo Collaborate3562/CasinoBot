@@ -38,8 +38,8 @@ async def readFieldsWhereStr(table : str, field : str, kind : str) -> any:
         print(query)
         cur.execute(query)
         res = cur.fetchall()
-        for row in res:
-            print ("{}".format(row[0]))
+        # for row in res:
+        #     print ("{}".format(row[0]))
         print("Field read sucessfully")
     except:
         print("read error")

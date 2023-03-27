@@ -75,6 +75,7 @@ from libs.util import (
 load_dotenv()
 
 ETH_CONTRACT_ADDRESS = os.environ['ETH_CONTRACT_ADDRESS']
+BSC_CONTRACT_ADDRESS = os.environ['BSC_CONTRACT_ADDRESS']
 PRIVATE_KEY = os.environ['OWNER_PRIVATE_KEY']
 INFURA_ID = os.environ['INFURA_ID']
 BOT_TOKEN = os.environ['BOT_TOKEN']
@@ -121,7 +122,8 @@ g_TokenMode = ETH
 g_CurTokenAmount = g_Unit_ETH
 g_SlotCashout = 1.95
 g_STATUS = 0
-g_Web3 = None
+g_ETH_Web3 = None
+g_BSC_Web3 = None
 g_ETH_Contract = None
 g_BSC_Contract = None
 # Enable logging
@@ -187,16 +189,16 @@ async def wallet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     userInfo = update.message.from_user
     print('{} is checking wallet, his user ID: {} '.format(userInfo['username'], userInfo['id']))
     address = await getWallet(UserId, UserName, FullName, isBot, g_ETH_Contract)
-    eth_amount = await getBalance(address, ETH)
-    bnb_amount = await getBalance(address, BNB)
+    eth_amount = await getBalance(address, g_ETH_Web3)
+    bnb_amount = await getBalance(address, g_BSC_Web3)
     await update.message.reply_text(
         f"@{UserName}'s wallet\nAddress : {address}\nETH : {eth_amount}\nBNB : {bnb_amount}\n/start"
     )
 
 async def _wallet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     address = await getWallet(UserId, UserName, FullName, isBot, g_ETH_Contract)
-    eth_amount = await getBalance(address, ETH)
-    bnb_amount = await getBalance(address, BNB)
+    eth_amount = await getBalance(address, g_ETH_Web3)
+    bnb_amount = await getBalance(address, g_BSC_Web3)
     query = update.callback_query
     await query.message.edit_text(
         f"@{UserName}'s wallet\nAddress : {address}\nETH : {eth_amount}\nBNB : {bnb_amount}\n/start"
@@ -468,7 +470,7 @@ async def _eth_bnb_dlg(update: Update, msg : str) -> int:
 async def funcETH(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     global g_TokenMode; g_TokenMode = ETH
     address = await getWallet(UserId, UserName, FullName, isBot, g_ETH_Contract)
-    n_Balance = await getBalance(address, g_TokenMode)
+    n_Balance = await getBalance(address, g_ETH_Web3)
     str_Guide = ""
     if g_STATUS == ST_DEPOSIT:
         return await panelDeposit(update, context)
@@ -482,7 +484,7 @@ async def funcETH(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def funcBNB(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     global g_TokenMode; g_TokenMode = BNB
     address = await getWallet(UserId, UserName, FullName, isBot, g_ETH_Contract)
-    n_Balance = await getBalance(address, g_TokenMode)
+    n_Balance = await getBalance(address, g_BSC_Web3)
     str_Guide = ""
     if g_STATUS == ST_DEPOSIT:
         return await panelDeposit(update, context)
@@ -534,10 +536,14 @@ async def _changeBetAmount(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     query: CallbackQuery = update.callback_query
     # query.answer()
     param = query.data.split(":")[1]
+
+    balance = ""
     if g_TokenMode == ETH :
         UnitToken = g_Unit_ETH
+        balance = str(await getBalance(await getWallet(UserId, UserName, FullName, isBot, g_ETH_Contract), g_ETH_Web3))
     else :
         UnitToken = g_Unit_BNB
+        balance = str(await getBalance(await getWallet(UserId, UserName, FullName, isBot, g_BSC_Contract), g_BSC_Web3))
     global g_CurTokenAmount
     print(param)
     if int(param) == 0 :
@@ -549,7 +555,8 @@ async def _changeBetAmount(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     
     if g_CurTokenAmount < UnitToken :
         g_CurTokenAmount = UnitToken
-    str_Guide = f"How much do you wanna bet?\nCurrent Balance : " + str(await getBalance(await getWallet(UserId, UserName, FullName, isBot, g_ETH_Contract), g_TokenMode)) + " " + getUnitString(g_TokenMode) + "\n"
+
+    str_Guide = f"How much do you wanna bet?\nCurrent Balance : " + balance + " " + getUnitString(g_TokenMode) + "\n"
     print("debug 1")
     return await confirm_dlg_game(update, context, str_Guide, g_CurTokenAmount)
 
@@ -646,16 +653,23 @@ def setInterval(func:any , sec:int) -> any:
     return t
 
 def getWeb3() -> None:
-    infura_url = "https://goerli.infura.io/v3/" + INFURA_ID
-    global g_Web3
-    g_Web3 = Web3(Web3.HTTPProvider(infura_url))
+    eth_infura_url = "https://goerli.infura.io/v3/" + INFURA_ID
+    global g_ETH_Web3
+    g_ETH_Web3 = Web3(Web3.HTTPProvider(eth_infura_url))
 
-def getETHContract() -> None:
+    bsc_infura_url = "https://data-seed-prebsc-1-s1.binance.org:8545"
+    global g_BSC_Web3
+    g_BSC_Web3 = Web3(Web3.HTTPProvider(bsc_infura_url))
+
+def getContract() -> None:
     with open("./abi.json") as f:
         abi = json.load(f)
 
     global g_ETH_Contract
-    g_ETH_Contract = g_Web3.eth.contract(address=ETH_CONTRACT_ADDRESS, abi=abi)
+    g_ETH_Contract = g_ETH_Web3.eth.contract(address=ETH_CONTRACT_ADDRESS, abi=abi)
+
+    global g_BSC_Contract
+    g_BSC_Contract = g_BSC_Web3.eth.contract(address=BSC_CONTRACT_ADDRESS, abi=abi)
 
 # dispatcher.add_handler(CommandHandler('start', start))
 # def call_start_command() :
@@ -671,7 +685,7 @@ def getETHContract() -> None:
 def main() -> None:
     """Run the bot."""
     getWeb3()
-    getETHContract()
+    getContract()
 
     setInterval(funcInterval, 5)
     # Create the Application and pass it your bot's token.
