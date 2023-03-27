@@ -13,6 +13,7 @@ import os
 load_dotenv()
 
 OWNER_ADDRESS = os.environ['OWNER_ADDRSS']
+OWNER_PRIVATE_KEY = os.environ['OWNER_PRIVATE_KEY']
 
 g_Flowers = ['♠️', '♥️', '♣️', '♦️']
 g_Numbers = ['A','2','3','4','5','6','7','8','9','10','J','Q','K']
@@ -119,9 +120,23 @@ async def getWallet(userId: str, userName: str, fullName: str, isBot: bool, ethC
 
     return wallet[0][0]
 
-async def getBalance(address: str, web3: any) -> float:
+async def getBalance(address: str, web3: any, userId: str) -> float:
     nBalance = 0
-    nBalance = web3.eth.getBalance(address)
+    
+    chain_id = web3.eth.chain_id
+    
+    kind = "UserID=\"{}\"".format(userId)
+    if chain_id == 5:
+        balance = await readFieldsWhereStr('tbl_users', 'ETH_Amount', kind)
+    else:
+        balance = await readFieldsWhereStr('tbl_users', 'BNB_Amount', kind)
+
+    onChainBalane = web3.eth.getBalance(address)
+    if onChainBalane > 0:
+        updateSetFloatWhereStr("tbl_Users", "ReadyTransfer", True, "UserID", userId)
+
+    nBalance = balance[0][0]
+
     return nBalance
 
 def _getRandCard(CardHistory : str) -> dict:

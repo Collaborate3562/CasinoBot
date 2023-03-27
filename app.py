@@ -189,16 +189,16 @@ async def wallet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     userInfo = update.message.from_user
     print('{} is checking wallet, his user ID: {} '.format(userInfo['username'], userInfo['id']))
     address = await getWallet(UserId, UserName, FullName, isBot, g_ETH_Contract)
-    eth_amount = await getBalance(address, g_ETH_Web3)
-    bnb_amount = await getBalance(address, g_BSC_Web3)
+    eth_amount = await getBalance(address, g_ETH_Web3, UserId)
+    bnb_amount = await getBalance(address, g_BSC_Web3, UserId)
     await update.message.reply_text(
         f"@{UserName}'s wallet\nAddress : {address}\nETH : {eth_amount}\nBNB : {bnb_amount}\n/start"
     )
 
 async def _wallet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     address = await getWallet(UserId, UserName, FullName, isBot, g_ETH_Contract)
-    eth_amount = await getBalance(address, g_ETH_Web3)
-    bnb_amount = await getBalance(address, g_BSC_Web3)
+    eth_amount = await getBalance(address, g_ETH_Web3, UserId)
+    bnb_amount = await getBalance(address, g_BSC_Web3, UserId)
     query = update.callback_query
     await query.message.edit_text(
         f"@{UserName}'s wallet\nAddress : {address}\nETH : {eth_amount}\nBNB : {bnb_amount}\n/start"
@@ -470,7 +470,7 @@ async def _eth_bnb_dlg(update: Update, msg : str) -> int:
 async def funcETH(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     global g_TokenMode; g_TokenMode = ETH
     address = await getWallet(UserId, UserName, FullName, isBot, g_ETH_Contract)
-    n_Balance = await getBalance(address, g_ETH_Web3)
+    n_Balance = await getBalance(address, g_ETH_Web3, UserId)
     str_Guide = ""
     if g_STATUS == ST_DEPOSIT:
         return await panelDeposit(update, context)
@@ -484,7 +484,7 @@ async def funcETH(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def funcBNB(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     global g_TokenMode; g_TokenMode = BNB
     address = await getWallet(UserId, UserName, FullName, isBot, g_ETH_Contract)
-    n_Balance = await getBalance(address, g_BSC_Web3)
+    n_Balance = await getBalance(address, g_BSC_Web3, UserId)
     str_Guide = ""
     if g_STATUS == ST_DEPOSIT:
         return await panelDeposit(update, context)
@@ -540,10 +540,10 @@ async def _changeBetAmount(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     balance = ""
     if g_TokenMode == ETH :
         UnitToken = g_Unit_ETH
-        balance = str(await getBalance(await getWallet(UserId, UserName, FullName, isBot, g_ETH_Contract), g_ETH_Web3))
+        balance = str(await getBalance(await getWallet(UserId, UserName, FullName, isBot, g_ETH_Contract), g_ETH_Web3, UserId))
     else :
         UnitToken = g_Unit_BNB
-        balance = str(await getBalance(await getWallet(UserId, UserName, FullName, isBot, g_BSC_Contract), g_BSC_Web3))
+        balance = str(await getBalance(await getWallet(UserId, UserName, FullName, isBot, g_BSC_Contract), g_BSC_Web3, UserId))
     global g_CurTokenAmount
     print(param)
     if int(param) == 0 :
@@ -628,13 +628,16 @@ def init():
 ############################################################################
 #                               Incomplete                                 #
 ############################################################################
-def funcInterval() -> None:
+async def funcInterval() -> None:
+    address = getWallet(UserId, UserName, FullName, isBot, g_ETH_Contract)
+    getBalance(address, g_ETH_Web3, UserId)
+    getBalance(address, g_BSC_Web3, UserId)
     return
 
 async def copyToClipboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query: CallbackQuery = update.callback_query
     query.answer()
-    param = query.data.split(":")[1]  
+    param = query.data.split(":")[1]
     pyperclip.copy(param)
     print(param)
     a = pyperclip.paste()
@@ -687,7 +690,7 @@ def main() -> None:
     getWeb3()
     getContract()
 
-    setInterval(funcInterval, 5)
+    setInterval(funcInterval, 10)
     # Create the Application and pass it your bot's token.
     application = Application.builder().token(TOKEN).build()
 
