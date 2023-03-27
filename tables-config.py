@@ -1,7 +1,7 @@
 import mysql.connector
 
 # db = mysql.connector.connect(host = "localhost",user = "root",passwd = "",database = "test1")
-db = mysql.connector.connect(user='root', password='bluesky0812',host='localhost',database = 'DB_AleekkCasino', auth_plugin='mysql_native_password')
+db = mysql.connector.connect(user='root', password='',host='localhost',database = 'DB_AleekkCasino', auth_plugin='mysql_native_password')
 cur = db.cursor()
 
 def table():

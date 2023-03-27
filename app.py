@@ -15,7 +15,10 @@ import json
 import logging
 import pyperclip
 import threading
+from web3 import Web3
 from telegram import __version__ as TG_VER
+from dotenv.main import load_dotenv
+import os
 
 try:
     from telegram import __version_info__
@@ -69,6 +72,13 @@ from libs.util import (
     readFieldsWhereStr
 )
 
+load_dotenv()
+
+ETH_CONTRACT_ADDRESS = os.environ['ETH_CONTRACT_ADDRESS']
+PRIVATE_KEY = os.environ['OWNER_PRIVATE_KEY']
+INFURA_ID = os.environ['INFURA_ID']
+BOT_TOKEN = os.environ['BOT_TOKEN']
+
 # import mysql.connector
 
 # db = mysql.connector.connect(host="localhost", user="root", passwd="bluesky0812", database="DB_AleekkCasino")
@@ -89,7 +99,11 @@ g_SlotMark = "🎰 SLOTS 🎰\n\n"
 g_HiloMark = "♠️♥️ HILO ♦️♣️\n\n"
 g_Cashout = 0
 UserName = ""
-TOKEN = "6282215563:AAFiWA4Owjxl0n9gfelo2jejlYScz7-UeJI"
+UserId = ""
+FullName = ""
+isBot = True
+# Test Token
+TOKEN = BOT_TOKEN
 g_Greetings = f"/start - Enter the casino\n"
 g_Help = f"/help - Describe all guide\n"
 g_Wallet = f"/wallet - Show all balances in your wallet\n"
@@ -107,6 +121,9 @@ g_TokenMode = ETH
 g_CurTokenAmount = g_Unit_ETH
 g_SlotCashout = 1.95
 g_STATUS = 0
+g_Web3 = None
+g_ETH_Contract = None
+g_BSC_Contract = None
 # Enable logging
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
@@ -119,16 +136,24 @@ logger = logging.getLogger(__name__)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     # Start the bot and ask what to do when the command /start is issued.
-    await updateSetStrWhereStr("tbl_Users", "Wallet", "0x999999", "RealName", "Thomas")
-    await updateSetFloatWhereStr("tbl_Users", "Wagered", 999, "RealName", "Thomas")
-    await readFieldsWhereStr("tbl_Users", "Wallet", "ETH_Amount > 20")
+    # await updateSetStrWhereStr("tbl_Users", "Wallet", "0x999999", "RealName", "Thomas")
+    # await updateSetFloatWhereStr("tbl_Users", "Wagered", 999, "RealName", "Thomas")
+    # await readFieldsWhereStr("tbl_Users", "Wallet", "ETH_Amount > 20")
 
     init()
     # global g_Chat_ID; g_Chat_ID = update.message.chat_id
     user = update.effective_user
     userInfo = update.message.from_user
-    global UserName
+
+    # get User Information
+    global UserName, UserId, FullName, isBot
     UserName = userInfo['username']
+    UserId = userInfo['id']
+    FirstName = userInfo['first_name']
+    LastName = userInfo['last_name']
+    FullName = "{} {}".format(FirstName, LastName)
+    isBot = userInfo['is_bot']
+
     str_Greetings = f"🙋‍♀️Hi @{UserName}\nWelcome to Aleekk Casino!\n"
     str_Intro = f"Please enjoy High-Low & Slot machine games here.\n"
     print('You talk with user {} and his user ID: {} '.format(userInfo['username'], userInfo['id']))
@@ -161,7 +186,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def wallet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     userInfo = update.message.from_user
     print('{} is checking wallet, his user ID: {} '.format(userInfo['username'], userInfo['id']))
-    address = await getWallet(UserName)
+    address = await getWallet(UserId, UserName, FullName, isBot, g_ETH_Contract)
     eth_amount = await getBalance(address, ETH)
     bnb_amount = await getBalance(address, BNB)
     await update.message.reply_text(
@@ -169,7 +194,7 @@ async def wallet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     )
 
 async def _wallet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    address = await getWallet(UserName)
+    address = await getWallet(UserId, UserName, FullName, isBot, g_ETH_Contract)
     eth_amount = await getBalance(address, ETH)
     bnb_amount = await getBalance(address, BNB)
     query = update.callback_query
@@ -442,7 +467,7 @@ async def _eth_bnb_dlg(update: Update, msg : str) -> int:
 ########################################################################
 async def funcETH(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     global g_TokenMode; g_TokenMode = ETH
-    address = await getWallet(UserName)
+    address = await getWallet(UserId, UserName, FullName, isBot, g_ETH_Contract)
     n_Balance = await getBalance(address, g_TokenMode)
     str_Guide = ""
     if g_STATUS == ST_DEPOSIT:
@@ -456,7 +481,7 @@ async def funcETH(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
  
 async def funcBNB(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     global g_TokenMode; g_TokenMode = BNB
-    address = await getWallet(UserName)
+    address = await getWallet(UserId, UserName, FullName, isBot, g_ETH_Contract)
     n_Balance = await getBalance(address, g_TokenMode)
     str_Guide = ""
     if g_STATUS == ST_DEPOSIT:
@@ -524,12 +549,12 @@ async def _changeBetAmount(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     
     if g_CurTokenAmount < UnitToken :
         g_CurTokenAmount = UnitToken
-    str_Guide = f"How much do you wanna bet?\nCurrent Balance : " + str(await getBalance(await getWallet(UserName), g_TokenMode)) + " " + getUnitString(g_TokenMode) + "\n"
+    str_Guide = f"How much do you wanna bet?\nCurrent Balance : " + str(await getBalance(await getWallet(UserId, UserName, FullName, isBot, g_ETH_Contract), g_TokenMode)) + " " + getUnitString(g_TokenMode) + "\n"
     print("debug 1")
     return await confirm_dlg_game(update, context, str_Guide, g_CurTokenAmount)
 
 async def panelDeposit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    address = await getWallet(UserName)
+    address = await getWallet(UserId, UserName, FullName, isBot, g_ETH_Contract)
     query = update.callback_query
     pattern = f"copyToClipboard:{address}"
     keyboard = [
@@ -620,6 +645,18 @@ def setInterval(func:any , sec:int) -> any:
     t.start()
     return t
 
+def getWeb3() -> None:
+    infura_url = "https://goerli.infura.io/v3/" + INFURA_ID
+    global g_Web3
+    g_Web3 = Web3(Web3.HTTPProvider(infura_url))
+
+def getETHContract() -> None:
+    with open("./abi.json") as f:
+        abi = json.load(f)
+
+    global g_ETH_Contract
+    g_ETH_Contract = g_Web3.eth.contract(address=ETH_CONTRACT_ADDRESS, abi=abi)
+
 # dispatcher.add_handler(CommandHandler('start', start))
 # def call_start_command() :
 #     update = telegram.Update(
@@ -633,6 +670,9 @@ def setInterval(func:any , sec:int) -> any:
 #     dispatcher.process_update(update)     
 def main() -> None:
     """Run the bot."""
+    getWeb3()
+    getETHContract()
+
     setInterval(funcInterval, 5)
     # Create the Application and pass it your bot's token.
     application = Application.builder().token(TOKEN).build()

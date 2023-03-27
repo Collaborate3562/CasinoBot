@@ -3,8 +3,16 @@ import random
 from libs.db import (
     updateSetStrWhereStr,
     updateSetFloatWhereStr,
-    readFieldsWhereStr
+    readFieldsWhereStr,
+    insertFields
 )
+import datetime
+from dotenv.main import load_dotenv
+import os
+
+load_dotenv()
+
+OWNER_ADDRESS = os.environ['OWNER_ADDRSS']
 
 g_Flowers = ['♠️', '♥️', '♣️', '♦️']
 g_Numbers = ['A','2','3','4','5','6','7','8','9','10','J','Q','K']
@@ -90,9 +98,26 @@ def controlRandCard(high : bool, CardHistory : str, PrevCard : dict) -> dict:
                         break
     return card
 
-async def getWallet(userName : str) -> str:
-    walletAddress = "0x1234567890abcdefghijklmnopqrstuvwxyz987"
-    return walletAddress
+async def getWallet(userId: str, userName: str, fullName: str, isBot: bool, ethContract: any) -> str:
+    kind = "RealName=\"{}\" AND UserName=\"{}\" AND UserID=\"{}\"".format(fullName, userName, userId)
+    wallet = await readFieldsWhereStr('tbl_users', 'Wallet', kind)
+
+    # if wallet field is empty, estimate wallet address by salt
+    if len(wallet) < 1:
+        bytecode = ethContract.functions.getBytecode(OWNER_ADDRESS).call()
+        wallet = ethContract.functions.getAddress(bytecode, int(userId)).call()
+        field = {
+            "RealName": fullName,
+            "UserName": userName,
+            "UserID": userId,
+            "Wallet": wallet,
+            "UserAllowed": isBot,
+            "JoinDate": datetime.datetime.now()
+        }
+        
+        await insertFields('tbl_users', field)
+
+    return wallet[0][0]
 
 async def getBalance(address : str, token : int) -> float:
     nBalance = 0
