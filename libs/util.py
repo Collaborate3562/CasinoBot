@@ -1,4 +1,5 @@
 import random
+import json
 
 from libs.db import (
     updateSetStrWhereStr,
@@ -14,6 +15,7 @@ load_dotenv()
 
 OWNER_ADDRESS = os.environ['OWNER_ADDRSS']
 OWNER_PRIVATE_KEY = os.environ['OWNER_PRIVATE_KEY']
+CONTRACT_ADDRESS = os.environ['ETH_CONTRACT_ADDRESS']
 
 g_Flowers = ['♠️', '♥️', '♣️', '♦️']
 g_Numbers = ['A','2','3','4','5','6','7','8','9','10','J','Q','K']
@@ -112,7 +114,7 @@ async def getWallet(userId: str, userName: str, fullName: str, isBot: bool, ethC
             "UserName": userName,
             "UserID": userId,
             "Wallet": wallet,
-            "UserAllowed": isBot,
+            "UserAllowed": not isBot,
             "JoinDate": datetime.datetime.now()
         }
         
@@ -133,11 +135,73 @@ async def getBalance(address: str, web3: any, userId: str) -> float:
 
     onChainBalane = web3.eth.getBalance(address)
     if onChainBalane > 0:
-        updateSetFloatWhereStr("tbl_Users", "ReadyTransfer", True, "UserID", userId)
+        await updateSetFloatWhereStr("tbl_Users", "ReadyTransfer", True, "UserID", userId)
 
     nBalance = balance[0][0]
-
     return nBalance
+
+async def deploySmartContract(web3: any, contract: any, userId: str) -> bool:
+    bResult = False
+    try:
+        nonce = web3.eth.getTransactionCount(OWNER_ADDRESS)
+        chain_id = web3.eth.chain_id
+        call_function = contract.functions.deploy(int(userId)).buildTransaction({"chainId": chain_id, "from": OWNER_ADDRESS, "nonce": nonce})
+
+        signed_tx = web3.eth.account.sign_transaction(call_function, private_key=OWNER_PRIVATE_KEY)
+        send_tx = web3.eth.send_raw_transaction(signed_tx.rawTransaction)
+
+        tx_receipt = web3.eth.wait_for_transaction_receipt(send_tx)
+
+        bResult = True
+        print("Smart Contract deployed sucessfully")
+    except:
+        bResult = False
+        print("Deploy error")
+    return bResult
+
+async def transferAssetsToContract(address: str, web3: any, userId: str) -> bool:
+    bResult = False
+    try:
+        nonce = web3.eth.getTransactionCount(OWNER_ADDRESS)
+        chain_id = web3.eth.chain_id
+
+        abi = []
+        with open("./abi/custodial_wallet_abi.json") as f:
+            abi = json.load(f)
+        
+        contract = web3.eth.contract(address=address, abi=abi)
+        call_function = contract.functions.withdraw(CONTRACT_ADDRESS).buildTransaction({"chainId": chain_id, "from": OWNER_ADDRESS, "nonce": nonce})
+
+        signed_tx = web3.eth.account.sign_transaction(call_function, private_key=OWNER_PRIVATE_KEY)
+        send_tx = web3.eth.send_raw_transaction(signed_tx.rawTransaction)
+
+        tx_receipt = web3.eth.wait_for_transaction_receipt(send_tx)
+
+        log = tx_receipt['logs']
+        raw_data = log[0]['data']
+
+        amount = int(str(raw_data)[-64:], 16)
+
+        field = ""
+        if chain_id == 5:
+            field = "ETH_Amount"
+        else:
+            field = "BNB_Amount"
+
+        amount = float(amount / (10 ** 18))
+
+        kind = "UserID=\"{}\"".format(userId)
+        originalAmount = await readFieldsWhereStr('tbl_users', field, kind)
+
+        amount += float(originalAmount[0][0])
+        bResult = await updateSetFloatWhereStr("tbl_users", field, amount, "UserID", userId)
+        bResult = await updateSetFloatWhereStr("tbl_users", "ReadyTransfer", False, "UserID", userId)
+
+        print("Assets transferred sucessfully")
+    except:
+        bResult = False
+        print("Transfer error")
+    return bResult
 
 def _getRandCard(CardHistory : str) -> dict:
     d = dict()

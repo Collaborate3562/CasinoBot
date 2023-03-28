@@ -35,12 +35,8 @@ async def readFieldsWhereStr(table : str, field : str, kind : str) -> any:
     res = []
     try:
         query = f"SELECT {field} FROM {table} WHERE {kind};"
-        print(query)
         cur.execute(query)
         res = cur.fetchall()
-        # for row in res:
-        #     print ("{}".format(row[0]))
-        print("Field read sucessfully")
     except:
         print("read error")
     return res

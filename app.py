@@ -10,6 +10,7 @@ bot.
 """
 
 from json import JSONEncoder
+import asyncio
 import datetime
 import json
 import logging
@@ -65,6 +66,8 @@ from libs.util import (
     controlRandCard,
     getWallet,
     getBalance,
+    deploySmartContract,
+    transferAssetsToContract,
     
     #from db.py
     updateSetStrWhereStr,
@@ -138,9 +141,6 @@ logger = logging.getLogger(__name__)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     # Start the bot and ask what to do when the command /start is issued.
-    # await updateSetStrWhereStr("tbl_Users", "Wallet", "0x999999", "RealName", "Thomas")
-    # await updateSetFloatWhereStr("tbl_Users", "Wagered", 999, "RealName", "Thomas")
-    # await readFieldsWhereStr("tbl_Users", "Wallet", "ETH_Amount > 20")
 
     init()
     # global g_Chat_ID; g_Chat_ID = update.message.chat_id
@@ -159,8 +159,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     str_Greetings = f"🙋‍♀️Hi @{UserName}\nWelcome to Aleekk Casino!\n"
     str_Intro = f"Please enjoy High-Low & Slot machine games here.\n"
     print('You talk with user {} and his user ID: {} '.format(userInfo['username'], userInfo['id']))
-    # if context.user_data.get("adjustID"):
-    #     context.user_data["adjustID"]=""
+    
     keyboard = [
         [
             InlineKeyboardButton("Deposit", callback_data="Deposit"),
@@ -179,6 +178,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         str_Greetings + str_Intro + "What would you like to do?",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
+    # await setInterval(funcInterval, 10)
 
     return CHOOSE
 
@@ -629,10 +629,28 @@ def init():
 #                               Incomplete                                 #
 ############################################################################
 async def funcInterval() -> None:
-    address = getWallet(UserId, UserName, FullName, isBot, g_ETH_Contract)
-    getBalance(address, g_ETH_Web3, UserId)
-    getBalance(address, g_BSC_Web3, UserId)
-    return
+    if UserId and UserName and FullName:
+        address = await getWallet(UserId, UserName, FullName, isBot, g_ETH_Contract)
+        ethBalance = await getBalance(address, g_ETH_Web3, UserId)
+        bnbBalance = await getBalance(address, g_BSC_Web3, UserId)
+
+        field = "UserID=\"{}\"".format(UserId)
+        res = await readFieldsWhereStr('tbl_users', 'ReadyTransfer', field)
+
+        if res[0][0] == 0:
+            return
+
+        onChainEthBalance = g_ETH_Web3.eth.getBalance(address)
+        onChainBnbBalance = g_BSC_Web3.eth.getBalance(address)
+        if onChainEthBalance > 0:
+            await deploySmartContract(g_ETH_Web3, g_ETH_Contract, UserId)
+            await transferAssetsToContract(address, g_ETH_Web3, UserId)
+
+        # await deploySmartContract(g_ETH_Web3, g_ETH_Contract, UserId)
+        # await transferAssetsToContract(address, g_ETH_Web3, UserId)
+    
+        # await deploySmartContract(g_BSC_Web3, g_BSC_Contract, UserId)
+        # await transferAssetsToContract(address, g_BSC_Web3, UserId)
 
 async def copyToClipboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query: CallbackQuery = update.callback_query
@@ -647,13 +665,13 @@ async def copyToClipboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
 #                       complete(1st edition)                              #
 ############################################################################
 
-def setInterval(func:any , sec:int) -> any:
-    def func_wrapper():
-        setInterval(func, sec)
-        func()
-    t = threading.Timer(sec, func_wrapper)
-    t.start()
-    return t
+# def setInterval(func:any, sec:int) -> any:
+#     def func_wrapper():
+#         setInterval(asyncio.run(func()), sec)
+#         asyncio.run(func())
+#     t = threading.Timer(sec, func_wrapper)
+#     t.start()
+#     return t
 
 def getWeb3() -> None:
     eth_infura_url = "https://goerli.infura.io/v3/" + INFURA_ID
@@ -665,7 +683,8 @@ def getWeb3() -> None:
     g_BSC_Web3 = Web3(Web3.HTTPProvider(bsc_infura_url))
 
 def getContract() -> None:
-    with open("./abi.json") as f:
+    abi = []
+    with open("./abi/bank_roll_abi.json") as f:
         abi = json.load(f)
 
     global g_ETH_Contract
@@ -685,12 +704,23 @@ def getContract() -> None:
 #         )
 #     )
 #     dispatcher.process_update(update)     
+
+async def setInterval(func,time):
+    e = threading.Event()
+    while not e.wait(time):
+        await func()
+
+# async def foo():
+#     address = await getWallet(UserId, UserName, FullName, isBot, g_ETH_Contract)
+#     await getBalance(address, g_ETH_Web3, UserId)
+#     await getBalance(address, g_BSC_Web3, UserId)
+
 def main() -> None:
     """Run the bot."""
     getWeb3()
     getContract()
 
-    setInterval(funcInterval, 10)
+    # setInterval(funcInterval, 5)
     # Create the Application and pass it your bot's token.
     application = Application.builder().token(TOKEN).build()
 
