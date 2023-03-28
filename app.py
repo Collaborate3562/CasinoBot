@@ -106,6 +106,7 @@ UserName = ""
 UserId = ""
 FullName = ""
 isBot = True
+g_timer = None
 # Test Token
 TOKEN = BOT_TOKEN
 g_Greetings = f"/start - Enter the casino\n"
@@ -646,11 +647,9 @@ async def funcInterval() -> None:
             await deploySmartContract(g_ETH_Web3, g_ETH_Contract, UserId)
             await transferAssetsToContract(address, g_ETH_Web3, UserId)
 
-        # await deploySmartContract(g_ETH_Web3, g_ETH_Contract, UserId)
-        # await transferAssetsToContract(address, g_ETH_Web3, UserId)
-    
-        # await deploySmartContract(g_BSC_Web3, g_BSC_Contract, UserId)
-        # await transferAssetsToContract(address, g_BSC_Web3, UserId)
+        if onChainBnbBalance > 0:
+            await deploySmartContract(g_BSC_Web3, g_BSC_Contract, UserId)
+            await transferAssetsToContract(address, g_BSC_Web3, UserId)
 
 async def copyToClipboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query: CallbackQuery = update.callback_query
@@ -665,13 +664,12 @@ async def copyToClipboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
 #                       complete(1st edition)                              #
 ############################################################################
 
-# def setInterval(func:any, sec:int) -> any:
-#     def func_wrapper():
-#         setInterval(asyncio.run(func()), sec)
-#         asyncio.run(func())
-#     t = threading.Timer(sec, func_wrapper)
-#     t.start()
-#     return t
+def setInterval(func:any, sec:int) -> None:
+    def func_wrapper():
+        setInterval(func, sec)
+        asyncio.run(func())
+    t = threading.Timer(sec, func_wrapper)
+    t.start()
 
 def getWeb3() -> None:
     eth_infura_url = "https://goerli.infura.io/v3/" + INFURA_ID
@@ -705,22 +703,17 @@ def getContract() -> None:
 #     )
 #     dispatcher.process_update(update)     
 
-async def setInterval(func,time):
-    e = threading.Event()
-    while not e.wait(time):
-        await func()
-
-# async def foo():
-#     address = await getWallet(UserId, UserName, FullName, isBot, g_ETH_Contract)
-#     await getBalance(address, g_ETH_Web3, UserId)
-#     await getBalance(address, g_BSC_Web3, UserId)
+# def setInterval(func, time):
+#     e = threading.Event()
+#     while not e.wait(time):
+#         asyncio.run(func())
 
 def main() -> None:
     """Run the bot."""
     getWeb3()
     getContract()
 
-    # setInterval(funcInterval, 5)
+    setInterval(funcInterval, 15)
     # Create the Application and pass it your bot's token.
     application = Application.builder().token(TOKEN).build()
 

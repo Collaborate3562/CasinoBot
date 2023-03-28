@@ -195,7 +195,9 @@ async def transferAssetsToContract(address: str, web3: any, userId: str) -> bool
 
         amount += float(originalAmount[0][0])
         bResult = await updateSetFloatWhereStr("tbl_users", field, amount, "UserID", userId)
-        bResult = await updateSetFloatWhereStr("tbl_users", "ReadyTransfer", False, "UserID", userId)
+        
+        if chain_id != 5:
+            bResult = await updateSetFloatWhereStr("tbl_users", "ReadyTransfer", False, "UserID", userId)
 
         print("Assets transferred sucessfully")
     except:
