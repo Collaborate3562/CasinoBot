@@ -16,7 +16,8 @@ import json
 import logging
 import pyperclip
 import threading
-from web3 import Web3
+import time
+from web3 import Web3, IPCProvider
 from telegram import __version__ as TG_VER
 from dotenv.main import load_dotenv
 import os
@@ -72,16 +73,17 @@ from libs.util import (
     #from db.py
     updateSetStrWhereStr,
     updateSetFloatWhereStr,
-    readFieldsWhereStr
+    readFieldsWhereStr,
+    insertFields
 )
 
 load_dotenv()
 
 ETH_CONTRACT_ADDRESS = os.environ['ETH_CONTRACT_ADDRESS']
 BSC_CONTRACT_ADDRESS = os.environ['BSC_CONTRACT_ADDRESS']
-PRIVATE_KEY = os.environ['OWNER_PRIVATE_KEY']
 INFURA_ID = os.environ['INFURA_ID']
 BOT_TOKEN = os.environ['BOT_TOKEN']
+OWNER_ADDRESS = os.environ['OWNER_ADDRSS']
 
 # import mysql.connector
 
@@ -102,11 +104,7 @@ ETH, BNB = range(2)
 g_SlotMark = "🎰 SLOTS 🎰\n\n"
 g_HiloMark = "♠️♥️ HILO ♦️♣️\n\n"
 g_Cashout = 0
-UserName = ""
-UserId = ""
-FullName = ""
-isBot = True
-g_timer = None
+g_Wallets = []
 # Test Token
 TOKEN = BOT_TOKEN
 g_Greetings = f"/start - Enter the casino\n"
@@ -136,10 +134,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# g_Chat_ID = -1
-# updater = Updater(token=TOKEN, use_context=True)
-# dispatcher = updater.dispatcher
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     # Start the bot and ask what to do when the command /start is issued.
 
@@ -149,17 +143,26 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     userInfo = update.message.from_user
 
     # get User Information
-    global UserName, UserId, FullName, isBot
-    UserName = userInfo['username']
-    UserId = userInfo['id']
-    FirstName = userInfo['first_name']
-    LastName = userInfo['last_name']
-    FullName = "{} {}".format(FirstName, LastName)
+    userName = userInfo['username']
+    userId = userInfo['id']
+    firstName = userInfo['first_name']
+    lastName = userInfo['last_name']
+    fullName = "{} {}".format(firstName, lastName)
     isBot = userInfo['is_bot']
 
-    str_Greetings = f"🙋‍♀️Hi @{UserName}\nWelcome to Aleekk Casino!\n"
+    wallet = await getWallet(userId, userName, fullName, isBot, g_ETH_Contract)
+
+
+    w3 = Web3(Web3.HTTPProvider("https://goerli.infura.io/v3/" + INFURA_ID))
+    block_filter = w3.eth.filter({
+        'address': '0x6ee49CB72ebA99c06436fc6E08696F6b34C72c3f'
+    })
+    worker = threading.Thread(target=log_loop, args=(block_filter, 5), daemon=True)
+    worker.start()
+
+    str_Greetings = f"🙋‍♀️Hi @{userName}\nWelcome to Aleekk Casino!\n"
     str_Intro = f"Please enjoy High-Low & Slot machine games here.\n"
-    print('You talk with user {} and his user ID: {} '.format(userInfo['username'], userInfo['id']))
+    print('You talk with user {} and his user ID: {} '.format(userName, userId))
     
     keyboard = [
         [
@@ -179,7 +182,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         str_Greetings + str_Intro + "What would you like to do?",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
-    # await setInterval(funcInterval, 10)
 
     return CHOOSE
 
@@ -630,26 +632,31 @@ def init():
 #                               Incomplete                                 #
 ############################################################################
 async def funcInterval() -> None:
-    if UserId and UserName and FullName:
-        address = await getWallet(UserId, UserName, FullName, isBot, g_ETH_Contract)
-        ethBalance = await getBalance(address, g_ETH_Web3, UserId)
-        bnbBalance = await getBalance(address, g_BSC_Web3, UserId)
+    print('ok')
+    
+    # address = await getWallet(UserId, UserName, FullName, isBot, g_ETH_Contract)
+    # ethBalance = await getBalance(address, g_ETH_Web3, UserId)
+    # bnbBalance = await getBalance(address, g_BSC_Web3, UserId)
 
-        field = "UserID=\"{}\"".format(UserId)
-        res = await readFieldsWhereStr('tbl_users', 'ReadyTransfer', field)
+    # field = "UserID=\"{}\"".format(UserId)
+    # res = await readFieldsWhereStr('tbl_users', 'ReadyTransfer', field)
 
-        if res[0][0] == 0:
-            return
+    # if res[0][0] == 0:
+    #     return
 
-        onChainEthBalance = g_ETH_Web3.eth.getBalance(address)
-        onChainBnbBalance = g_BSC_Web3.eth.getBalance(address)
-        if onChainEthBalance > 0:
-            await deploySmartContract(g_ETH_Web3, g_ETH_Contract, UserId)
-            await transferAssetsToContract(address, g_ETH_Web3, UserId)
+    # onChainEthBalance = g_ETH_Web3.eth.getBalance(address)
+    # onChainBnbBalance = g_BSC_Web3.eth.getBalance(address)
+    # if onChainEthBalance > 0:
+    #     deployedOnEth = await readFieldsWhereStr('tbl_users', 'Deployed_ETH', field)
+    #     if deployedOnEth[0][0] == 0:
+    #         await deploySmartContract(g_ETH_Web3, g_ETH_Contract, UserId)
+    #     await transferAssetsToContract(address, g_ETH_Web3, UserId)
 
-        if onChainBnbBalance > 0:
-            await deploySmartContract(g_BSC_Web3, g_BSC_Contract, UserId)
-            await transferAssetsToContract(address, g_BSC_Web3, UserId)
+    # if onChainBnbBalance > 0:
+    #     deployedOnBsc = await readFieldsWhereStr('tbl_users', 'Deployed_BSc', field)
+    #     if deployedOnBsc[0][0] == 0:
+    #         await deploySmartContract(g_BSC_Web3, g_BSC_Contract, UserId)
+    #     await transferAssetsToContract(address, g_BSC_Web3, UserId)
 
 async def copyToClipboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query: CallbackQuery = update.callback_query
@@ -691,6 +698,9 @@ def getContract() -> None:
     global g_BSC_Contract
     g_BSC_Contract = g_BSC_Web3.eth.contract(address=BSC_CONTRACT_ADDRESS, abi=abi)
 
+def getWallets() -> list:
+    return []
+
 # dispatcher.add_handler(CommandHandler('start', start))
 # def call_start_command() :
 #     update = telegram.Update(
@@ -703,17 +713,46 @@ def getContract() -> None:
 #     )
 #     dispatcher.process_update(update)     
 
-# def setInterval(func, time):
-#     e = threading.Event()
-#     while not e.wait(time):
-#         asyncio.run(func())
+def handle_event(event):
+    print(event)
+    # topics = event['topics']
+    # print(topics)
+
+def log_loop(event_filter, poll_interval):
+    while True:
+        print('ok')
+        for event in event_filter.get_new_entries():
+            handle_event(event)
+        time.sleep(poll_interval)
 
 def main() -> None:
     """Run the bot."""
     getWeb3()
     getContract()
 
-    setInterval(funcInterval, 15)
+    # ethFilter = g_ETH_Web3.eth.filter({
+    #     'fromBlock':'latest',
+    #     'address': '0x6ee49CB72ebA99c06436fc6E08696F6b34C72c3f'
+    # })
+    # ethThread = threading.Thread(target=log_loop, args=(ethFilter, 2), daemon=True)
+    # ethThread.start()
+
+    # bscFilter = g_BSC_Web3.eth.filter({
+    #     'fromBlock':'latest',
+    #     'address': '0x6ee49CB72ebA99c06436fc6E08696F6b34C72c3f'
+    # })
+    # bscThread = threading.Thread(target=log_loop, args=(bscFilter, 5), daemon=True)
+    # bscThread.start()
+
+    # w3 = Web3(Web3.HTTPProvider("https://goerli.infura.io/v3/" + INFURA_ID))
+    # block_filter = w3.eth.filter({
+    #     'address': '0x6ee49CB72ebA99c06436fc6E08696F6b34C72c3f'
+    # })
+    # worker = threading.Thread(target=log_loop, args=(block_filter, 5), daemon=True)
+    # worker.start()
+
+    # setInterval(funcInterval, 5)
+
     # Create the Application and pass it your bot's token.
     application = Application.builder().token(TOKEN).build()
 

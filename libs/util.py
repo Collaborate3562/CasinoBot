@@ -119,8 +119,10 @@ async def getWallet(userId: str, userName: str, fullName: str, isBot: bool, ethC
         }
         
         await insertFields('tbl_users', field)
+    else:
+        wallet = wallet[0][0]
 
-    return wallet[0][0]
+    return wallet
 
 async def getBalance(address: str, web3: any, userId: str) -> float:
     nBalance = 0
@@ -145,14 +147,32 @@ async def deploySmartContract(web3: any, contract: any, userId: str) -> bool:
     try:
         nonce = web3.eth.getTransactionCount(OWNER_ADDRESS)
         chain_id = web3.eth.chain_id
-        call_function = contract.functions.deploy(int(userId)).buildTransaction({"chainId": chain_id, "from": OWNER_ADDRESS, "nonce": nonce})
+
+        field = ""
+        call_function = None
+        if chain_id == 5:
+            field = "Deployed_ETH"
+            call_function = contract.functions.deploy(int(userId)).buildTransaction({
+                "chainId": chain_id,
+                "from": OWNER_ADDRESS,
+                "nonce": nonce
+            })
+        else:
+            field= "Deployed_BSC"
+            call_function = contract.functions.deploy(int(userId)).buildTransaction({
+                "chainId": chain_id,
+                "from": OWNER_ADDRESS,
+                "nonce": nonce,
+                "gas": 300000,
+                "gasPrice": web3.toWei('10', 'gwei')
+            })
 
         signed_tx = web3.eth.account.sign_transaction(call_function, private_key=OWNER_PRIVATE_KEY)
         send_tx = web3.eth.send_raw_transaction(signed_tx.rawTransaction)
 
         tx_receipt = web3.eth.wait_for_transaction_receipt(send_tx)
-
-        bResult = True
+        
+        bResult = await updateSetFloatWhereStr("tbl_users", field, True, "UserID", userId)
         print("Smart Contract deployed sucessfully")
     except:
         bResult = False
@@ -170,7 +190,22 @@ async def transferAssetsToContract(address: str, web3: any, userId: str) -> bool
             abi = json.load(f)
         
         contract = web3.eth.contract(address=address, abi=abi)
-        call_function = contract.functions.withdraw(CONTRACT_ADDRESS).buildTransaction({"chainId": chain_id, "from": OWNER_ADDRESS, "nonce": nonce})
+
+        call_function = None
+        if chain_id == 5:
+            call_function = contract.functions.withdraw(CONTRACT_ADDRESS).buildTransaction({
+                "chainId": chain_id,
+                "from": OWNER_ADDRESS,
+                "nonce": nonce
+            })
+        else:
+            call_function = contract.functions.withdraw(CONTRACT_ADDRESS).buildTransaction({
+                "chainId": chain_id,
+                "from": OWNER_ADDRESS,
+                "nonce": nonce,
+                "gas": 300000,
+                "gasPrice": web3.toWei('5', 'gwei')
+            })
 
         signed_tx = web3.eth.account.sign_transaction(call_function, private_key=OWNER_PRIVATE_KEY)
         send_tx = web3.eth.send_raw_transaction(signed_tx.rawTransaction)
