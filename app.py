@@ -134,6 +134,19 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+def handle_event(event):
+    print(event)
+    # topics = event['topics']
+    # print(topics)
+
+def log_loop(event_filter, poll_interval):
+    while True:
+        print('ok')
+        for event in event_filter.get_new_entries():
+            handle_event(event)
+        time.sleep(poll_interval)
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     # Start the bot and ask what to do when the command /start is issued.
 
@@ -152,13 +165,23 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
     wallet = await getWallet(userId, userName, fullName, isBot, g_ETH_Contract)
 
+    eth_block_number = g_ETH_Web3.eth.get_block_number()
 
-    w3 = Web3(Web3.HTTPProvider("https://goerli.infura.io/v3/" + INFURA_ID))
-    block_filter = w3.eth.filter({
-        'address': '0x6ee49CB72ebA99c06436fc6E08696F6b34C72c3f'
+    eth_filter = g_ETH_Web3.eth.filter({
+        'fromBlock': eth_block_number,
+        'address': wallet
     })
-    worker = threading.Thread(target=log_loop, args=(block_filter, 5), daemon=True)
-    worker.start()
+    ethThread = threading.Thread(target=log_loop, args=(eth_filter, 5), daemon=True)
+    ethThread.start()
+
+    bsc_block_number = g_BSC_Web3.eth.get_block_number()
+
+    bsc_filter = g_ETH_Web3.eth.filter({
+        'fromBlock': bsc_block_number,
+        'address': wallet
+    })
+    bscThread = threading.Thread(target=log_loop, args=(bsc_filter, 5), daemon=True)
+    bscThread.start()
 
     str_Greetings = f"🙋‍♀️Hi @{userName}\nWelcome to Aleekk Casino!\n"
     str_Intro = f"Please enjoy High-Low & Slot machine games here.\n"
@@ -190,21 +213,33 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 ########################################################################
 async def wallet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     userInfo = update.message.from_user
-    print('{} is checking wallet, his user ID: {} '.format(userInfo['username'], userInfo['id']))
-    address = await getWallet(UserId, UserName, FullName, isBot, g_ETH_Contract)
-    eth_amount = await getBalance(address, g_ETH_Web3, UserId)
-    bnb_amount = await getBalance(address, g_BSC_Web3, UserId)
+    userId = userInfo['id']
+    userName = userInfo['username']
+
+    print('{} is checking wallet, his user ID: {} '.format(userName, userId))
+    
+    kind = "UserID=\"{}\"".format(userId)
+    wallet = await readFieldsWhereStr("tbl_users", "Wallet", kind)
+
+    address = wallet[0][0]
+    eth_amount = await getBalance(address, g_ETH_Web3, userId)
+    bnb_amount = await getBalance(address, g_BSC_Web3, userId)
     await update.message.reply_text(
-        f"@{UserName}'s wallet\nAddress : {address}\nETH : {eth_amount}\nBNB : {bnb_amount}\n/start"
+        f"@{userName}'s wallet\nAddress : {address}\nETH : {eth_amount}\nBNB : {bnb_amount}\n/start"
     )
 
 async def _wallet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    address = await getWallet(UserId, UserName, FullName, isBot, g_ETH_Contract)
-    eth_amount = await getBalance(address, g_ETH_Web3, UserId)
-    bnb_amount = await getBalance(address, g_BSC_Web3, UserId)
     query = update.callback_query
+    userId = query.message.chat.id
+
+    kind = "UserID=\"{}\"".format(userId)
+    wallet = await readFieldsWhereStr("tbl_users", "Wallet", kind)
+
+    address = wallet[0][0]
+    eth_amount = await getBalance(address, g_ETH_Web3, userId)
+    bnb_amount = await getBalance(address, g_BSC_Web3, userId)
     await query.message.edit_text(
-        f"@{UserName}'s wallet\nAddress : {address}\nETH : {eth_amount}\nBNB : {bnb_amount}\n/start"
+        f"@{userId}'s wallet\nAddress : {address}\nETH : {eth_amount}\nBNB : {bnb_amount}\n/start"
     )
 
 ########################################################################
@@ -472,8 +507,15 @@ async def _eth_bnb_dlg(update: Update, msg : str) -> int:
 ########################################################################
 async def funcETH(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     global g_TokenMode; g_TokenMode = ETH
-    address = await getWallet(UserId, UserName, FullName, isBot, g_ETH_Contract)
-    n_Balance = await getBalance(address, g_ETH_Web3, UserId)
+
+    query = update.callback_query
+    userId = query.message.chat.id
+
+    kind = "UserID=\"{}\"".format(userId)
+    wallet = await readFieldsWhereStr("tbl_users", "Wallet", kind)
+
+    address = wallet[0][0]
+    n_Balance = await getBalance(address, g_ETH_Web3, userId)
     str_Guide = ""
     if g_STATUS == ST_DEPOSIT:
         return await panelDeposit(update, context)
@@ -486,8 +528,15 @@ async def funcETH(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
  
 async def funcBNB(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     global g_TokenMode; g_TokenMode = BNB
-    address = await getWallet(UserId, UserName, FullName, isBot, g_ETH_Contract)
-    n_Balance = await getBalance(address, g_BSC_Web3, UserId)
+
+    query = update.callback_query
+    userId = query.message.chat.id
+    
+    kind = "UserID=\"{}\"".format(userId)
+    wallet = await readFieldsWhereStr("tbl_users", "Wallet", kind)
+
+    address = wallet[0][0]
+    n_Balance = await getBalance(address, g_BSC_Web3, userId)
     str_Guide = ""
     if g_STATUS == ST_DEPOSIT:
         return await panelDeposit(update, context)
@@ -537,16 +586,23 @@ async def confirm_dlg_game(update: Update, context: ContextTypes.DEFAULT_TYPE, m
 ########################################################################
 async def _changeBetAmount(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query: CallbackQuery = update.callback_query
+    
+    userId = query.message.chat.id
+    
+    kind = "UserID=\"{}\"".format(userId)
+    wallet = await readFieldsWhereStr("tbl_users", "Wallet", kind)
+
+    address = wallet[0][0]
     # query.answer()
     param = query.data.split(":")[1]
 
     balance = ""
     if g_TokenMode == ETH :
         UnitToken = g_Unit_ETH
-        balance = str(await getBalance(await getWallet(UserId, UserName, FullName, isBot, g_ETH_Contract), g_ETH_Web3, UserId))
+        balance = str(await getBalance(address, g_ETH_Web3, userId))
     else :
         UnitToken = g_Unit_BNB
-        balance = str(await getBalance(await getWallet(UserId, UserName, FullName, isBot, g_BSC_Contract), g_BSC_Web3, UserId))
+        balance = str(await getBalance(address, g_BSC_Web3, userId))
     global g_CurTokenAmount
     print(param)
     if int(param) == 0 :
@@ -564,8 +620,14 @@ async def _changeBetAmount(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     return await confirm_dlg_game(update, context, str_Guide, g_CurTokenAmount)
 
 async def panelDeposit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    address = await getWallet(UserId, UserName, FullName, isBot, g_ETH_Contract)
     query = update.callback_query
+    userId = query.message.chat.id
+
+    kind = "UserID=\"{}\"".format(userId)
+    wallet = await readFieldsWhereStr("tbl_users", "Wallet", kind)
+
+    address = wallet[0][0]
+    
     pattern = f"copyToClipboard:{address}"
     keyboard = [
         [
@@ -698,9 +760,6 @@ def getContract() -> None:
     global g_BSC_Contract
     g_BSC_Contract = g_BSC_Web3.eth.contract(address=BSC_CONTRACT_ADDRESS, abi=abi)
 
-def getWallets() -> list:
-    return []
-
 # dispatcher.add_handler(CommandHandler('start', start))
 # def call_start_command() :
 #     update = telegram.Update(
@@ -713,45 +772,10 @@ def getWallets() -> list:
 #     )
 #     dispatcher.process_update(update)     
 
-def handle_event(event):
-    print(event)
-    # topics = event['topics']
-    # print(topics)
-
-def log_loop(event_filter, poll_interval):
-    while True:
-        print('ok')
-        for event in event_filter.get_new_entries():
-            handle_event(event)
-        time.sleep(poll_interval)
-
 def main() -> None:
     """Run the bot."""
     getWeb3()
     getContract()
-
-    # ethFilter = g_ETH_Web3.eth.filter({
-    #     'fromBlock':'latest',
-    #     'address': '0x6ee49CB72ebA99c06436fc6E08696F6b34C72c3f'
-    # })
-    # ethThread = threading.Thread(target=log_loop, args=(ethFilter, 2), daemon=True)
-    # ethThread.start()
-
-    # bscFilter = g_BSC_Web3.eth.filter({
-    #     'fromBlock':'latest',
-    #     'address': '0x6ee49CB72ebA99c06436fc6E08696F6b34C72c3f'
-    # })
-    # bscThread = threading.Thread(target=log_loop, args=(bscFilter, 5), daemon=True)
-    # bscThread.start()
-
-    # w3 = Web3(Web3.HTTPProvider("https://goerli.infura.io/v3/" + INFURA_ID))
-    # block_filter = w3.eth.filter({
-    #     'address': '0x6ee49CB72ebA99c06436fc6E08696F6b34C72c3f'
-    # })
-    # worker = threading.Thread(target=log_loop, args=(block_filter, 5), daemon=True)
-    # worker.start()
-
-    # setInterval(funcInterval, 5)
 
     # Create the Application and pass it your bot's token.
     application = Application.builder().token(TOKEN).build()
