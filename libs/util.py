@@ -163,7 +163,7 @@ async def deploySmartContract(web3: any, contract: any, userId: str) -> bool:
                 "chainId": chain_id,
                 "from": OWNER_ADDRESS,
                 "nonce": nonce,
-                "gas": 300000,
+                "gas": 500000,
                 "gasPrice": web3.toWei('10', 'gwei')
             })
 
@@ -203,8 +203,8 @@ async def transferAssetsToContract(address: str, web3: any, userId: str) -> bool
                 "chainId": chain_id,
                 "from": OWNER_ADDRESS,
                 "nonce": nonce,
-                "gas": 300000,
-                "gasPrice": web3.toWei('5', 'gwei')
+                "gas": 500000,
+                "gasPrice": web3.toWei('10', 'gwei')
             })
 
         signed_tx = web3.eth.account.sign_transaction(call_function, private_key=OWNER_PRIVATE_KEY)

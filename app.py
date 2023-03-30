@@ -50,9 +50,7 @@ from telegram.ext import (
     ConversationHandler,
     MessageHandler,
     filters,
-    CallbackContext,
-    # Updater,
-    # Dispatcher
+    CallbackContext
 )
 
 # from telebot import TeleBot
@@ -60,7 +58,6 @@ from telegram.ext import (
 from telegram_bot_calendar import DetailedTelegramCalendar, LSTEP
 
 from libs.util import (
-    #from util.py
     getPricefromAmount,
     roll,
     getUnitString,
@@ -84,18 +81,6 @@ BSC_CONTRACT_ADDRESS = os.environ['BSC_CONTRACT_ADDRESS']
 INFURA_ID = os.environ['INFURA_ID']
 BOT_TOKEN = os.environ['BOT_TOKEN']
 OWNER_ADDRESS = os.environ['OWNER_ADDRSS']
-
-# import mysql.connector
-
-# db = mysql.connector.connect(host="localhost", user="root", passwd="bluesky0812", database="DB_AleekkCasino")
-
-# cur = db.cursor()
-
-
-# class DateTimeEncoder(JSONEncoder):
-#     def default(self, obj):
-#         if isinstance(obj, (datetime.date, datetime.datetime)):
-#             return obj.isoformat()
 
 CHOOSE, WALLET, SELECT, STATUS, PAYMENT, DEPOSIT, DISPLAY, COPY, LASTSELECT, AGAINSLOT, AGAINHILO, PANELHILO, PANELSLOT, BETTINGHILO, PANELDEPOSIT, PANELWITHDRAW = range(16)
 ST_DEPOSIT, ST_WITHDRAW, ST_HILO, ST_SLOT = range(4)
@@ -134,24 +119,35 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-
-def handle_event(event):
-    print(event)
-    # topics = event['topics']
-    # print(topics)
-
-def log_loop(event_filter, poll_interval):
+def log_loop(poll_interval, userId, wallet, tokenMode):
     while True:
-        print('ok')
-        for event in event_filter.get_new_entries():
-            handle_event(event)
+        field = "UserID=\"{}\"".format(userId)
+        if tokenMode == ETH:
+            onChainEthBalance = g_ETH_Web3.eth.getBalance(wallet)
+            if onChainEthBalance == 0:
+                return
+            
+            deployedOnEth = asyncio.run(readFieldsWhereStr('tbl_users', 'Deployed_ETH', field))
+            if deployedOnEth[0][0] == 0:
+                asyncio.run(deploySmartContract(g_ETH_Web3, g_ETH_Contract, userId))
+
+            asyncio.run(transferAssetsToContract(wallet, g_ETH_Web3, userId))
+        else:
+            onChainBnbBalance = g_BSC_Web3.eth.getBalance(wallet)
+            if onChainBnbBalance == 0:
+                return
+            
+            deployedOnBSC = asyncio.run(readFieldsWhereStr('tbl_users', 'Deployed_BSC', field))
+            if deployedOnBSC[0][0] == 0:
+                asyncio.run(deploySmartContract(g_BSC_Web3, g_BSC_Contract, userId))
+            asyncio.run(transferAssetsToContract(wallet, g_BSC_Web3, userId))
         time.sleep(poll_interval)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     # Start the bot and ask what to do when the command /start is issued.
 
     init()
-    # global g_Chat_ID; g_Chat_ID = update.message.chat_id
+
     user = update.effective_user
     userInfo = update.message.from_user
 
@@ -164,23 +160,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     isBot = userInfo['is_bot']
 
     wallet = await getWallet(userId, userName, fullName, isBot, g_ETH_Contract)
+    global g_TokenMode
 
-    eth_block_number = g_ETH_Web3.eth.get_block_number()
-
-    eth_filter = g_ETH_Web3.eth.filter({
-        'fromBlock': eth_block_number,
-        'address': wallet
-    })
-    ethThread = threading.Thread(target=log_loop, args=(eth_filter, 5), daemon=True)
+    g_TokenMode = ETH
+    ethThread = threading.Thread(target=log_loop, args=(10, userId, wallet, g_TokenMode), daemon=True)
     ethThread.start()
 
-    bsc_block_number = g_BSC_Web3.eth.get_block_number()
-
-    bsc_filter = g_ETH_Web3.eth.filter({
-        'fromBlock': bsc_block_number,
-        'address': wallet
-    })
-    bscThread = threading.Thread(target=log_loop, args=(bsc_filter, 5), daemon=True)
+    g_TokenMode = BNB
+    bscThread = threading.Thread(target=log_loop, args=(10, userId, wallet, g_TokenMode), daemon=True)
     bscThread.start()
 
     str_Greetings = f"🙋‍♀️Hi @{userName}\nWelcome to Aleekk Casino!\n"
@@ -652,12 +639,7 @@ async def help(update: Update, context: CallbackContext) -> int:
  
 async def _help(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
-    # await query.answer()
-    # await query.edit_message_text(text=f"Selected option: {query.data}")
-    # await context.bot.send_message(update.effective_user.id, "start")
-    # chat_id = g_Chat_ID
-    # await context.bot.send_message(chat_id=chat_id, text="/help")
-    # await context.bot.send_chat_action(chat_id=chat_id, text="/help")
+    
     await query.message.edit_text(
         g_Greetings + g_Help + g_Wallet + g_Deposit + g_Withdraw + g_Hilo + g_Slot + g_LeaderBoard
     )
@@ -694,31 +676,7 @@ def init():
 #                               Incomplete                                 #
 ############################################################################
 async def funcInterval() -> None:
-    print('ok')
-    
-    # address = await getWallet(UserId, UserName, FullName, isBot, g_ETH_Contract)
-    # ethBalance = await getBalance(address, g_ETH_Web3, UserId)
-    # bnbBalance = await getBalance(address, g_BSC_Web3, UserId)
-
-    # field = "UserID=\"{}\"".format(UserId)
-    # res = await readFieldsWhereStr('tbl_users', 'ReadyTransfer', field)
-
-    # if res[0][0] == 0:
-    #     return
-
-    # onChainEthBalance = g_ETH_Web3.eth.getBalance(address)
-    # onChainBnbBalance = g_BSC_Web3.eth.getBalance(address)
-    # if onChainEthBalance > 0:
-    #     deployedOnEth = await readFieldsWhereStr('tbl_users', 'Deployed_ETH', field)
-    #     if deployedOnEth[0][0] == 0:
-    #         await deploySmartContract(g_ETH_Web3, g_ETH_Contract, UserId)
-    #     await transferAssetsToContract(address, g_ETH_Web3, UserId)
-
-    # if onChainBnbBalance > 0:
-    #     deployedOnBsc = await readFieldsWhereStr('tbl_users', 'Deployed_BSc', field)
-    #     if deployedOnBsc[0][0] == 0:
-    #         await deploySmartContract(g_BSC_Web3, g_BSC_Contract, UserId)
-    #     await transferAssetsToContract(address, g_BSC_Web3, UserId)
+    pass
 
 async def copyToClipboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query: CallbackQuery = update.callback_query
@@ -760,18 +718,6 @@ def getContract() -> None:
     global g_BSC_Contract
     g_BSC_Contract = g_BSC_Web3.eth.contract(address=BSC_CONTRACT_ADDRESS, abi=abi)
 
-# dispatcher.add_handler(CommandHandler('start', start))
-# def call_start_command() :
-#     update = telegram.Update(
-#         update_id=1,
-#         message=telegram.Message(
-#             message_id=1,
-#             chat=telegram.Chat(id=1, type=telegram.Chat.PRIVATE),
-#             text='/start'
-#         )
-#     )
-#     dispatcher.process_update(update)     
-
 def main() -> None:
     """Run the bot."""
     getWeb3()
@@ -807,8 +753,6 @@ def main() -> None:
                           CallbackQueryHandler(cancel, pattern="Cancel"),
                           CallbackQueryHandler(_panelHilo, pattern="Play"),
                           CallbackQueryHandler(_panelSlot, pattern="Roll")],
-            # PANELHILO: [MessageHandler(filters.TEXT, _panelHilo)],
-            # PANELSLOT: [MessageHandler(filters.TEXT, _panelSlot)],
             AGAINSLOT: [CallbackQueryHandler(cancel, pattern="Cancel"),
                         CallbackQueryHandler(_panelSlot, pattern="againSlot"),
                         CallbackQueryHandler(_playSlot, pattern="changeBet"),],
