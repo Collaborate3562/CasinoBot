@@ -66,6 +66,7 @@ from libs.util import (
     getBalance,
     deploySmartContract,
     transferAssetsToContract,
+    withdrawAmount,
     
     #from db.py
     updateSetStrWhereStr,
@@ -78,11 +79,13 @@ load_dotenv()
 
 ETH_CONTRACT_ADDRESS = os.environ['ETH_CONTRACT_ADDRESS']
 BSC_CONTRACT_ADDRESS = os.environ['BSC_CONTRACT_ADDRESS']
+TEST_ETH_SCAN_URI = os.environ['TEST_ETH_SCAN_URL']
+TEST_BSC_SCAN_URI = os.environ['TEST_BSC_SCAN_URL']
 INFURA_ID = os.environ['INFURA_ID']
 BOT_TOKEN = os.environ['BOT_TOKEN']
 OWNER_ADDRESS = os.environ['OWNER_ADDRSS']
 
-CHOOSE, WALLET, SELECT, STATUS, PAYMENT, DEPOSIT, DISPLAY, COPY, LASTSELECT, AGAINSLOT, AGAINHILO, PANELHILO, PANELSLOT, BETTINGHILO, PANELDEPOSIT, PANELWITHDRAW = range(16)
+CHOOSE, WALLET, SELECT, STATUS, PAYMENT, DEPOSIT, DISPLAY, COPY, LASTSELECT, AGAINSLOT, AGAINHILO, PANELHILO, PANELSLOT, BETTINGHILO, PANELDEPOSIT, PANELWITHDRAW, PANELWITHDRAWADDRESS  = range(17)
 ST_DEPOSIT, ST_WITHDRAW, ST_HILO, ST_SLOT = range(4)
 ETH, BNB = range(2)
 
@@ -175,7 +178,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         g_UsersStatus[userId] = {
             "isThreadRunning": True,
             "ethBetAmount": g_Unit_ETH,
-            "bnbBetAmount": g_Unit_BNB
+            "bnbBetAmount": g_Unit_BNB,
+            "withdrawTokenType": ETH,
+            "withdrawAmount": float(0)
         }
 
     str_Greetings = f"🙋‍♀️Hi @{userName}\nWelcome to Aleekk Casino!\n"
@@ -460,7 +465,7 @@ async def confirm_dlg_withdraw(update: Update, msg : str) -> int:
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
     # ForceReply(selective=True) #TODO
-    return PANELWITHDRAW
+    return PANELWITHDRAWADDRESS
 ########################################################################
 #                            +eth_bnb_dlg                              #
 ########################################################################
@@ -502,6 +507,7 @@ async def _eth_bnb_dlg(update: Update, msg : str) -> int:
 ########################################################################
 async def funcETH(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     global g_TokenMode; g_TokenMode = ETH
+    global g_UsersStatus
 
     query = update.callback_query
     userId = query.message.chat.id
@@ -516,10 +522,11 @@ async def funcETH(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         return await panelDeposit(update, context)
     if g_STATUS == ST_WITHDRAW :
         str_Guide = f"How much do you wanna withdraw?\nCurrent Balance : {n_Balance} ETH\n"
+        g_UsersStatus[userId]['withdrawTokenType'] = ETH
         return await confirm_dlg_withdraw(update, str_Guide)
     else :
         str_Guide = f"How much do you wanna bet?\nCurrent Balance : {n_Balance} ETH\n"
-        return await confirm_dlg_game(update, context, str_Guide, g_Unit_ETH)
+        return await confirm_dlg_game(update, context, str_Guide, userId, g_Unit_ETH)
  
 async def funcBNB(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     global g_TokenMode; g_TokenMode = BNB
@@ -537,13 +544,18 @@ async def funcBNB(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         return await panelDeposit(update, context)
     if g_STATUS == ST_WITHDRAW :
         str_Guide = f"How much do you wanna withdraw?\nCurrent Balance : {n_Balance} BNB\n"
+        g_UsersStatus[userId]['withdrawTokenType'] = BNB
         return await confirm_dlg_withdraw(update, str_Guide)
     else :
         str_Guide = f"How much do you wanna bet?\nCurrent Balance : {n_Balance} BNB\n"
-        return await confirm_dlg_game(update, context, str_Guide, g_Unit_BNB)
+        return await confirm_dlg_game(update, context, str_Guide, userId, g_Unit_BNB)
 
-async def confirm_dlg_game(update: Update, context: ContextTypes.DEFAULT_TYPE, msg : str, tokenAmount : float) -> int:
+async def confirm_dlg_game(update: Update, context: ContextTypes.DEFAULT_TYPE, msg : str, userId: str, tokenAmount : float) -> int:
     sAmount = f"\nYou can bet {tokenAmount}" + getUnitString(g_TokenMode) + await getPricefromAmount(tokenAmount, g_TokenMode)
+    if g_TokenMode == ETH:
+        g_UsersStatus[userId]['ethBetAmount'] = tokenAmount
+    else:
+        g_UsersStatus[userId]['ethBetAmount'] = tokenAmount
     query = update.callback_query
     
     sPlayButton = ""
@@ -603,17 +615,17 @@ async def _changeBetAmount(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     print(param)
     if int(param) == 0 :
         print(g_CurTokenAmount)
-        g_CurTokenAmount /= 2
+        g_CurTokenAmount = g_CurTokenAmount / 2
         print(g_CurTokenAmount)
     else :
-        g_CurTokenAmount *= 2
+        g_CurTokenAmount = g_CurTokenAmount * 2
     
     if g_CurTokenAmount < UnitToken :
-        g_CurTokenAmount = UnitToken
+        g_CurTokenAmount = balance
 
     str_Guide = f"How much do you wanna bet?\nCurrent Balance : " + balance + " " + getUnitString(g_TokenMode) + "\n"
     print("debug 1")
-    return await confirm_dlg_game(update, context, str_Guide, g_CurTokenAmount)
+    return await confirm_dlg_game(update, context, str_Guide, userId, g_CurTokenAmount)
 
 async def panelDeposit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
@@ -636,9 +648,75 @@ async def panelDeposit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     )
     return COPY
 
-async def panelWithdraw(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def panelWithdrawAddress(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    g_UsersStatus
+    userId = update.message.from_user['id']
+    kind = "UserID=\"{}\"".format(userId)
+
+    amount = update.message.text
+    
+    field = ''
+    symbol= ''
+    tokenMode = g_UsersStatus[userId]['withdrawTokenType']
+    if tokenMode == ETH:
+        field = 'ETH_Amount'
+        symbol = 'ETH'
+    else:
+        field = 'BNB_Amount'
+        symbol = 'BNB'
+    balance = await readFieldsWhereStr('tbl_users', field, kind)
+
+    if float(amount) > float(balance[0][0]):
+        await update.message.reply_text(
+            "Insufficient Balance.\nYour current balance is {} {}\n/start".format(balance[0][0], symbol)
+        )
+        return
+
+    g_UsersStatus[userId]['withdrawAmount'] = float(amount)
+    keyboard = [
+        [
+            InlineKeyboardButton("Cancel", callback_data="Cancel"),
+        ]
+    ]
     await update.message.reply_text(
-        "Submit your withdraw request",
+        "Please enter your wallet address to withdraw",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+    return PANELWITHDRAW
+
+async def panelWithdraw(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    g_UsersStatus
+    userId = update.message.from_user['id']
+    
+    tokenMode = g_UsersStatus[userId]['withdrawTokenType']
+    amount = g_UsersStatus[userId]['withdrawAmount']
+    contract = None
+    w3 = None
+    scanUri = ''
+
+    if tokenMode == ETH:
+        w3 = g_ETH_Web3
+        contract = g_ETH_Contract
+        scanUri = TEST_ETH_SCAN_URI
+    else:
+        w3 = g_BSC_Web3
+        contract = g_BSC_Contract
+        scanUri = TEST_BSC_SCAN_URI
+
+    wallet = update.message.text
+    print(wallet)
+
+    tx = await withdrawAmount(w3, contract, wallet, amount, userId)
+    if not 'transactionHash' in tx:
+        await update.message.reply_text(
+            "Withdraw failed. Please try again.\n/start"
+        )
+        return
+    
+    tx_hash = tx['transactionHash'].hex()
+
+    await update.message.reply_text(
+        "Withdrawed successfully.\n{}{}\n/start".format(scanUri, tx_hash)
     )
 
 async def help(update: Update, context: CallbackContext) -> int:
@@ -769,6 +847,8 @@ def main() -> None:
                         CallbackQueryHandler(_panelHilo, pattern="againHilo"),
                         CallbackQueryHandler(_playHilo, pattern="changeBet")],
             PANELDEPOSIT: [MessageHandler(filters.TEXT, panelDeposit)],
+            PANELWITHDRAWADDRESS: [MessageHandler(filters.TEXT, panelWithdrawAddress),
+                                   CallbackQueryHandler(cancel, pattern="Cancel")],
             PANELWITHDRAW: [MessageHandler(filters.TEXT, panelWithdraw)],
             BETTINGHILO: [CallbackQueryHandler(_cashoutHilo, pattern="CashoutHilo"),
                           CallbackQueryHandler(_high, pattern="High"),
