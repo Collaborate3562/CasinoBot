@@ -89,7 +89,7 @@ ETH, BNB = range(2)
 g_SlotMark = "🎰 SLOTS 🎰\n\n"
 g_HiloMark = "♠️♥️ HILO ♦️♣️\n\n"
 g_Cashout = 0
-g_Wallets = []
+g_UsersStatus = {}
 # Test Token
 TOKEN = BOT_TOKEN
 g_Greetings = f"/start - Enter the casino\n"
@@ -160,15 +160,23 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     isBot = userInfo['is_bot']
 
     wallet = await getWallet(userId, userName, fullName, isBot, g_ETH_Contract)
+
+    global g_UsersStatus
     global g_TokenMode
+    if not userId in g_UsersStatus:
+        g_TokenMode = ETH
+        ethThread = threading.Thread(target=log_loop, args=(10, userId, wallet, g_TokenMode), daemon=True)
+        ethThread.start()
 
-    g_TokenMode = ETH
-    ethThread = threading.Thread(target=log_loop, args=(10, userId, wallet, g_TokenMode), daemon=True)
-    ethThread.start()
+        g_TokenMode = BNB
+        bscThread = threading.Thread(target=log_loop, args=(10, userId, wallet, g_TokenMode), daemon=True)
+        bscThread.start()
 
-    g_TokenMode = BNB
-    bscThread = threading.Thread(target=log_loop, args=(10, userId, wallet, g_TokenMode), daemon=True)
-    bscThread.start()
+        g_UsersStatus[userId] = {
+            "isThreadRunning": True,
+            "ethBetAmount": g_Unit_ETH,
+            "bnbBetAmount": g_Unit_BNB
+        }
 
     str_Greetings = f"🙋‍♀️Hi @{userName}\nWelcome to Aleekk Casino!\n"
     str_Intro = f"Please enjoy High-Low & Slot machine games here.\n"
@@ -584,11 +592,12 @@ async def _changeBetAmount(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     param = query.data.split(":")[1]
 
     balance = ""
+    global g_UsersStatus
     if g_TokenMode == ETH :
-        UnitToken = g_Unit_ETH
+        UnitToken = g_UsersStatus[userId]['ethBetAmount']
         balance = str(await getBalance(address, g_ETH_Web3, userId))
     else :
-        UnitToken = g_Unit_BNB
+        UnitToken = g_UsersStatus[userId]['bnbBetAmount']
         balance = str(await getBalance(address, g_BSC_Web3, userId))
     global g_CurTokenAmount
     print(param)
