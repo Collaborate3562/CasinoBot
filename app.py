@@ -127,23 +127,18 @@ def log_loop(poll_interval, userId, wallet, tokenMode):
         field = "UserID=\"{}\"".format(userId)
         if tokenMode == ETH:
             onChainEthBalance = g_ETH_Web3.eth.getBalance(wallet)
-            if onChainEthBalance == 0:
-                return
-            
-            deployedOnEth = asyncio.run(readFieldsWhereStr('tbl_users', 'Deployed_ETH', field))
-            if deployedOnEth[0][0] == 0:
-                asyncio.run(deploySmartContract(g_ETH_Web3, g_ETH_Contract, userId))
-
-            asyncio.run(transferAssetsToContract(wallet, g_ETH_Web3, userId))
+            if onChainEthBalance > 0:
+                deployedOnEth = asyncio.run(readFieldsWhereStr('tbl_users', 'Deployed_ETH', field))
+                if deployedOnEth[0][0] == 0:
+                    asyncio.run(deploySmartContract(g_ETH_Web3, g_ETH_Contract, userId))
+                asyncio.run(transferAssetsToContract(wallet, g_ETH_Web3, userId))
         else:
             onChainBnbBalance = g_BSC_Web3.eth.getBalance(wallet)
-            if onChainBnbBalance == 0:
-                return
-            
-            deployedOnBSC = asyncio.run(readFieldsWhereStr('tbl_users', 'Deployed_BSC', field))
-            if deployedOnBSC[0][0] == 0:
-                asyncio.run(deploySmartContract(g_BSC_Web3, g_BSC_Contract, userId))
-            asyncio.run(transferAssetsToContract(wallet, g_BSC_Web3, userId))
+            if onChainBnbBalance > 0:
+                deployedOnBSC = asyncio.run(readFieldsWhereStr('tbl_users', 'Deployed_BSC', field))
+                if deployedOnBSC[0][0] == 0:
+                    asyncio.run(deploySmartContract(g_BSC_Web3, g_BSC_Contract, userId))
+                asyncio.run(transferAssetsToContract(wallet, g_BSC_Web3, userId))
         time.sleep(poll_interval)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -716,7 +711,7 @@ async def panelWithdraw(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     tx_hash = tx['transactionHash'].hex()
 
     await update.message.reply_text(
-        "Withdrawed successfully.\n{}{}\n/start".format(scanUri, tx_hash)
+        "Withdrawed successfully.\n{}tx/{}\n/start".format(scanUri, tx_hash)
     )
 
 async def help(update: Update, context: CallbackContext) -> int:
