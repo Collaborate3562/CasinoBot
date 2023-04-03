@@ -1,7 +1,6 @@
 import mysql.connector
 import datetime
 
-# db = mysql.connector.connect(host = "localhost",user = "root",passwd = "",database = "test1")
 db = mysql.connector.connect(user='root', password='',host='localhost',database = 'DB_AleekkCasino', auth_plugin='mysql_native_password')
 cur = db.cursor()
 
