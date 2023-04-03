@@ -69,6 +69,7 @@ from libs.util import (
     withdrawAmount,
     isFloat,
     isValidContractOrWallet,
+    truncDecimal,
     
     #from db.py
     updateSetStrWhereStr,
@@ -231,10 +232,14 @@ async def _wallet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     wallet = await readFieldsWhereStr("tbl_users", "Wallet", kind)
 
     address = wallet[0][0]
+
+    userName = await readFieldsWhereStr("tbl_users", "UserName", kind)
+    userName = userName[0][0]
+    
     eth_amount = await getBalance(address, g_ETH_Web3, userId)
     bnb_amount = await getBalance(address, g_BSC_Web3, userId)
     await query.message.edit_text(
-        f"@{userId}'s wallet\nAddress : {address}\nETH : {eth_amount}\nBNB : {bnb_amount}\n/start"
+        f"@{userName}'s wallet\nAddress : {address}\nETH : {eth_amount}\nBNB : {bnb_amount}\n/start"
     )
 
 ########################################################################
@@ -268,8 +273,6 @@ async def _panelHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     sGreeting = ""
 
     userId = query.from_user.id
-    print("_panelHilo")
-    print(g_UserStatus[userId]['cashOutHiloCnt'])
     if g_UserStatus[userId]['cashOutHiloCnt'] == 0 :
         kind = "UserID=\"{}\"".format(userId)
         wallet = await readFieldsWhereStr("tbl_users", "Wallet", kind)
@@ -283,7 +286,17 @@ async def _panelHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             web3 = g_BSC_Web3
             field = "BNB_Amount"
         f_Balance = await getBalance(address, web3, userId)
+        if float(f_Balance) <= 0:
+            await query.message.edit_text(
+                "Insufficient funds.\n/start\n/deposit"
+            )
+            return
+    
         tokenAmount = g_UserStatus[userId]['curTokenAmount']
+        if float(f_Balance) <= float(tokenAmount):
+            tokenAmount = float(f_Balance)
+            g_UserStatus[userId]['curTokenAmount'] = float(f_Balance)
+        
         print(f_Balance)
         print(tokenAmount)
         await updateSetFloatWhereStr("tbl_users", field, f_Balance - tokenAmount, "UserID", userId)
@@ -310,7 +323,7 @@ async def _panelHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             ]
         ]
         await query.message.edit_text(
-            f"{sGreeting}Current Card: {str(newCard['label'])}\n\nCashout : x{g_HiloCashOut[cashOutId]}\nCashout:" + str(g_UserStatus[userId]['curTokenAmount'] * g_HiloCashOut[cashOutId]) + getUnitString(g_UserStatus[userId]['tokenMode']) + "\nWhat is your next guess? High or Low?",
+            f"{sGreeting}Current Card: {str(newCard['label'])}\n\nCashout : x{g_HiloCashOut[cashOutId]}\nCashout:" + truncDecimal(str(g_UserStatus[userId]['curTokenAmount'] * g_HiloCashOut[cashOutId])) + getUnitString(g_UserStatus[userId]['tokenMode']) + "\nWhat is your next guess? High or Low?",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
         return BETTINGHILO
@@ -352,8 +365,10 @@ async def _high(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     else :
         print("High=>FALSE")
         sCardHistory = g_UserStatus[userId]['cardHistory']
+        tokenMode = g_UserStatus[userId]['tokenMode']
         tokenAmount = g_UserStatus[userId]['curTokenAmount']
         init(userId)
+        g_UserStatus[userId]['tokenMode'] = tokenMode
         g_UserStatus[userId]['curTokenAmount'] = tokenAmount
         g_UserStatus[userId]['cashOutHiloCnt'] = 0
         
@@ -403,8 +418,10 @@ async def _low(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         print("LOW=>FALSE")
         g_UserStatus[userId]['cashOutHiloCnt'] = 0
         sCardHistory = g_UserStatus[userId]['cardHistory']
+        tokenMode = g_UserStatus[userId]['tokenMode']
         tokenAmount = g_UserStatus[userId]['curTokenAmount']
         init(userId)
+        g_UserStatus[userId]['tokenMode'] = tokenMode
         g_UserStatus[userId]['curTokenAmount'] = tokenAmount
 
         kind = "UserID=\"{}\"".format(userId)
@@ -511,11 +528,21 @@ async def _panelSlot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         web3 = g_BSC_Web3
         field = "BNB_Amount"
     f_Balance = await getBalance(address, web3, userId)
+    
+    if float(f_Balance) <= 0:
+        await query.message.edit_text(
+            "Insufficient funds.\n/start\n/deposit"
+        )
+        return
+    
     tokenAmount = g_UserStatus[userId]['curTokenAmount']
+    if float(f_Balance) <= float(tokenAmount):
+        tokenAmount = float(f_Balance)
+        g_UserStatus[userId]['curTokenAmount'] = float(f_Balance)
+    
     print(f_Balance)
     print(tokenAmount)
     await updateSetFloatWhereStr("tbl_users", field, f_Balance - tokenAmount, "UserID", userId)
-    f_Balance = await getBalance(address, web3, userId)
 
     slot = roll()
     label = slot["label"]
@@ -656,8 +683,6 @@ async def funcETH(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         return await confirm_dlg_withdraw(update, str_Guide)
     else :
         str_Guide = f"How much do you wanna bet?\nCurrent Balance : {f_Balance} ETH\n"
-        print("funcETH")
-        print(g_UserStatus[userId]['curTokenAmount'])
         return await confirm_dlg_game(update, context, str_Guide, userId, g_Unit_ETH, f_Balance)
  
 async def funcBNB(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -667,7 +692,8 @@ async def funcBNB(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     userId = query.from_user.id
     g_UserStatus[userId]['curTokenAmount'] = g_Unit_BNB
     g_UserStatus[userId]['tokenMode'] = BNB
-    
+    print("TokenMode")
+    print(g_UserStatus[userId]['tokenMode'])
     kind = "UserID=\"{}\"".format(userId)
     wallet = await readFieldsWhereStr("tbl_users", "Wallet", kind)
 
@@ -687,7 +713,7 @@ async def funcBNB(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def confirm_dlg_game(update: Update, context: ContextTypes.DEFAULT_TYPE, msg : str, userId: str, tokenAmount : float, balance : float) -> int:
     tokenMode = g_UserStatus[userId]['tokenMode']
-    sAmount = f"\nYou can bet {tokenAmount}" + getUnitString(tokenMode) + await getPricefromAmount(tokenAmount, tokenMode)
+    sAmount = f"\nYou can bet {tokenAmount}" + getUnitString(tokenMode) + "($" + truncDecimal(await getPricefromAmount(tokenAmount, tokenMode)) + ")"
     # if tokenMode == ETH:
     #     g_UserStatus[userId]['ethBetAmount'] = tokenAmount
     # else:
@@ -743,8 +769,10 @@ async def _changeBetAmount(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     userId = query.from_user.id
     
     global g_UserStatus
+    tokenMode = g_UserStatus[userId]['tokenMode']
     curTokenAmount = g_UserStatus[userId]['curTokenAmount']
     init(userId)
+    g_UserStatus[userId]['tokenMode'] = tokenMode
     g_UserStatus[userId]['curTokenAmount'] = curTokenAmount
     
     kind = "UserID=\"{}\"".format(userId)

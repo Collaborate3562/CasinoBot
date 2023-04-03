@@ -22,13 +22,13 @@ ETH_MAINNET_ID = os.environ['ETH_MAINNET_ID']
 g_Flowers = ['♠️', '♥️', '♣️', '♦️']
 g_Numbers = ['A','2','3','4','5','6','7','8','9','10','J','Q','K']
 
-async def getPricefromAmount(amount : float, kind : int) -> str:
+async def getPricefromAmount(amount : float, kind : int) -> float:
     price = 0
     if kind == 0 :
         price = amount * 1700
     else :
         price = amount * 300
-    return f" (${price})"
+    return price
 
 def isValidAddress(w3: any, address: str) -> bool:
     return w3.isAddress(address)
@@ -42,6 +42,9 @@ def isFloat(amount: str) -> bool:
         return True
     except ValueError:
         return False
+
+def truncDecimal(value: str, dec: int = 2) -> str:
+    return '{:.2f}'.format(value)
 
 def roll() -> dict:
     slot = dict()
@@ -117,7 +120,7 @@ def controlRandCard(high : bool, CardHistory : str, PrevCard : dict) -> dict:
     return card
 
 async def getWallet(userId: str, userName: str, fullName: str, isBot: bool, ethContract: any) -> str:
-    kind = "RealName=\"{}\" AND UserName=\"{}\" AND UserID=\"{}\"".format(fullName, userName, userId)
+    kind = "UserName=\"{}\" AND UserID=\"{}\"".format(userName, userId)
     wallet = await readFieldsWhereStr('tbl_users', 'Wallet', kind)
 
     # if wallet field is empty, estimate wallet address by salt

@@ -55,5 +55,5 @@ async def insertFields(table : str, field : dict) -> bool:
         bRes = True
         print("Field created sucessfully")
     except:
-        print("read error")
+        print("Insert error")
     return bRes
