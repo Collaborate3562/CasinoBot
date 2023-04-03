@@ -67,6 +67,8 @@ from libs.util import (
     deploySmartContract,
     transferAssetsToContract,
     withdrawAmount,
+    isFloat,
+    isValidContractOrWallet,
     
     #from db.py
     updateSetStrWhereStr,
@@ -649,7 +651,7 @@ async def funcETH(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if status == ST_DEPOSIT:
         return await panelDeposit(update, context)
     if status == ST_WITHDRAW :
-        str_Guide = f"How much do you wanna withdraw?\nCurrent Balance : {f_Balance} ETH\n"
+        str_Guide = f"How much do you wanna withdraw?\nCurrent Balance : {f_Balance} ETH\ne.g /0.01"
         g_UserStatus[userId]['withdrawTokenType'] = ETH
         return await confirm_dlg_withdraw(update, str_Guide)
     else :
@@ -804,10 +806,18 @@ async def panelDeposit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 
 async def panelWithdrawAddress(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     g_UserStatus
+    text = update.message.text
+
+    if not (len(text.split('/')) == 2 and isFloat(text.split('/')[1])):
+        await update.message.reply_text(
+            "Incorrect form type.\ne.g /0.01\n/start"
+        )
+        return
+
     userId = update.message.from_user['id']
     kind = "UserID=\"{}\"".format(userId)
 
-    amount = update.message.text
+    amount = text.split('/')[1]
     
     field = ''
     symbol= ''
@@ -833,7 +843,7 @@ async def panelWithdrawAddress(update: Update, context: ContextTypes.DEFAULT_TYP
         ]
     ]
     await update.message.reply_text(
-        "Please enter your wallet address to withdraw",
+        "Please enter your wallet address to withdraw\ne.g /0x43cbE0ce689dbC237A517EFAAe7B8c290C4e64df",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
     return PANELWITHDRAW
@@ -841,6 +851,7 @@ async def panelWithdrawAddress(update: Update, context: ContextTypes.DEFAULT_TYP
 async def panelWithdraw(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     g_UserStatus
     userId = update.message.from_user['id']
+    text = update.message.text
     
     tokenMode = g_UserStatus[userId]['withdrawTokenType']
     amount = g_UserStatus[userId]['withdrawAmount']
@@ -857,8 +868,19 @@ async def panelWithdraw(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         contract = g_BSC_Contract
         scanUri = TEST_BSC_SCAN_URI
 
-    wallet = update.message.text
-    print(wallet)
+    if not len(text.split('/')) == 2:
+        await update.message.reply_text(
+            "Incorrect form type.\ne.g /0x43cbE0ce689dbC237A517EFAAe7B8c290C4e64df\n/start"
+        )
+        return
+
+    if not isValidContractOrWallet(w3, text.split('/')[1]):
+        await update.message.reply_text(
+            "Invalid wallet address.\nPlease check address again.\n/start"
+        )
+        return
+
+    wallet = text.split('/')[1]
 
     tx = await withdrawAmount(w3, contract, wallet, amount, userId)
     if not 'transactionHash' in tx:

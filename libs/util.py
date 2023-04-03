@@ -30,6 +30,19 @@ async def getPricefromAmount(amount : float, kind : int) -> str:
         price = amount * 300
     return f" (${price})"
 
+def isValidAddress(w3: any, address: str) -> bool:
+    return w3.isAddress(address)
+
+def isValidContractOrWallet(w3: any, address: str) -> bool:
+    return isValidAddress(w3, address) and (len(address) == 42 or len(address) == 40)
+
+def isFloat(amount: str) -> bool:
+    try:
+        float(amount)
+        return True
+    except ValueError:
+        return False
+
 def roll() -> dict:
     slot = dict()
     num1 = random.randint(0, 4)
