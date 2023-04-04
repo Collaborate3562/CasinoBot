@@ -358,7 +358,7 @@ async def _panelHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             ]
         ]
         await query.message.edit_text(
-            f"{sGreeting}Current Card: {str(newCard['label'])}\n\nCashout : x{g_HiloCashOut[cashOutId]}\nCashout:" + truncDecimal(g_UserStatus[userId]['curTokenAmount'] * g_HiloCashOut[cashOutId]) + getUnitString(g_UserStatus[userId]['tokenMode']) + "\nWhat is your next guess? High or Low?",
+            f"{sGreeting}Current Card: {str(newCard['label'])}\n\nCashout : x{g_HiloCashOut[cashOutId]}\nCashout:" +"{:.4f}".format(g_UserStatus[userId]['curTokenAmount'] * g_HiloCashOut[cashOutId]) + getUnitString(g_UserStatus[userId]['tokenMode']) + "\nWhat is your next guess? High or Low?",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
         return BETTINGHILO
@@ -524,7 +524,7 @@ async def _cashoutHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         ]
     ]
     await query.message.edit_text(
-        f"🏆🏆🏆\n\nYou won!\n\nCashout : x{g_HiloCashOut[cashOutId]}\nCashout : " + str(profit) + getUnitString(tokenMode) + f"\nBalance:{f_Balance} {getUnitString(tokenMode)}",
+        f"🏆🏆🏆\n\nYou won!\n\nCashout : x{g_HiloCashOut[cashOutId]}\nCashout : " + "{:.4f}".format(profit) + getUnitString(tokenMode) + f"\nBalance:{f_Balance} {getUnitString(tokenMode)}",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
     return AGAINHILO
@@ -1050,9 +1050,7 @@ async def copyToClipboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     param = query.data.split(":")[1]
     pyperclip.copy(param)
-    print(param)
-    a = pyperclip.paste()
-    print(a)
+    print('copied params', param)
 
 ############################################################################
 #                       complete(1st edition)                              #
