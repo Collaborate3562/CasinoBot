@@ -30,6 +30,17 @@ async def updateSetFloatWhereStr(table : str, field : str, value : float, where 
         print("update error")
     return bRes
 
+async def getTopValuesByLimit(table: str, field: str, orderColumn: str, limit: int) -> bool:
+    res = []
+    try:
+        query = f"SELECT {field} FROM {table} ORDER BY {orderColumn} DESC LIMIT {limit};"
+        cur.execute(query)
+        res = cur.fetchall()
+        print("Get Top Values sucessfully")
+    except:
+        print("Get Top Values error")
+    return res
+
 async def readFieldsWhereStr(table : str, field : str, kind : str) -> any:
     res = []
     try:
