@@ -88,7 +88,7 @@ INFURA_ID = os.environ['INFURA_ID']
 BOT_TOKEN = os.environ['BOT_TOKEN']
 OWNER_ADDRESS = os.environ['OWNER_ADDRSS']
 
-CHOOSE, WALLET, SELECT, STATUS, PAYMENT, DEPOSIT, DISPLAY, COPY, LASTSELECT, AGAINSLOT, AGAINHILO, PANELHILO, PANELSLOT, BETTINGHILO, PANELDEPOSIT, PANELWITHDRAW, PANELWITHDRAWADDRESS  = range(17)
+CHOOSE, WALLET, SELECT, STATUS, PAYMENT, DEPOSIT, DISPLAY, COPY, LASTSELECT, AGAINSLOT, AGAINHILO, PANELHILO, PANELSLOT, BETTINGHILO, PANELDEPOSIT, PANELWITHDRAW, PANELWITHDRAWADDRESS, ONLYCANCEL = range(18)
 ST_DEPOSIT, ST_WITHDRAW, ST_HILO, ST_SLOT = range(4)
 ETH, BNB = range(2)
 
@@ -165,8 +165,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         bscThread.start()
 
     g_UserStatus[userId] = {
-        # "ethBetAmount": g_Unit_ETH,
-        # "bnbBetAmount": g_Unit_BNB,
+        "update": update,
+        "context": context,
         "withdrawTokenType": ETH,
         "withdrawAmount": float(0),
         "status" : int(0),
@@ -220,9 +220,18 @@ async def wallet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     address = wallet[0][0]
     eth_amount = await getBalance(address, g_ETH_Web3, userId)
     bnb_amount = await getBalance(address, g_BSC_Web3, userId)
+
+    keyboard = [
+        [
+            InlineKeyboardButton("Back", callback_data="Cancel"),
+        ]
+    ]
     await update.message.reply_text(
-        f"@{userName}'s wallet\nAddress : {address}\nETH : {eth_amount}\nBNB : {bnb_amount}\n/start"
+        f"@{userName}'s wallet\nAddress : {address}\nETH : {eth_amount}\nBNB : {bnb_amount}",
+        reply_markup=InlineKeyboardMarkup(keyboard)
     )
+
+    return ONLYCANCEL
 
 async def _wallet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     print('_wallet')
@@ -239,9 +248,18 @@ async def _wallet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     
     eth_amount = await getBalance(address, g_ETH_Web3, userId)
     bnb_amount = await getBalance(address, g_BSC_Web3, userId)
+
+    keyboard = [
+        [
+            InlineKeyboardButton("Back", callback_data="Cancel"),
+        ]
+    ]
     await query.message.edit_text(
-        f"@{userName}'s wallet\nAddress : {address}\nETH : {eth_amount}\nBNB : {bnb_amount}\n/start"
+        f"@{userName}'s wallet\nAddress : {address}\nETH : {eth_amount}\nBNB : {bnb_amount}",
+        reply_markup=InlineKeyboardMarkup(keyboard)
     )
+
+    return ONLYCANCEL
 
 ########################################################################
 #                            +High - Low                               #
@@ -292,10 +310,18 @@ async def _panelHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         
         f_Balance = await getBalance(address, web3, userId)
         if float(f_Balance) <= 0:
+            keyboard = [
+                [
+                    InlineKeyboardButton("Deposit", callback_data="Deposit"),
+                    InlineKeyboardButton("Back", callback_data="Cancel"),
+                ]
+            ]
             await query.message.edit_text(
-                "Insufficient funds.\n/start\n/deposit"
+                "Insufficient funds!\nPlease deposit more funds",
+                reply_markup=InlineKeyboardMarkup(keyboard)
             )
-            return
+
+            return ONLYCANCEL & CHOOSE
     
         tokenAmount = g_UserStatus[userId]['curTokenAmount']
         if float(f_Balance) <= tokenAmount:
@@ -332,7 +358,7 @@ async def _panelHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             ]
         ]
         await query.message.edit_text(
-            f"{sGreeting}Current Card: {str(newCard['label'])}\n\nCashout : x{g_HiloCashOut[cashOutId]}\nCashout:" + str(g_UserStatus[userId]['curTokenAmount'] * g_HiloCashOut[cashOutId]) + getUnitString(g_UserStatus[userId]['tokenMode']) + "\nWhat is your next guess? High or Low?",
+            f"{sGreeting}Current Card: {str(newCard['label'])}\n\nCashout : x{g_HiloCashOut[cashOutId]}\nCashout:" + truncDecimal(g_UserStatus[userId]['curTokenAmount'] * g_HiloCashOut[cashOutId]) + getUnitString(g_UserStatus[userId]['tokenMode']) + "\nWhat is your next guess? High or Low?",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
         return BETTINGHILO
@@ -960,10 +986,18 @@ async def help(update: Update, context: CallbackContext) -> int:
  
 async def _help(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
-    
+
+    keyboard = [
+        [
+            InlineKeyboardButton("Back", callback_data="Cancel"),
+        ]
+    ]
     await query.message.edit_text(
-        g_Greetings + g_Help + g_Wallet + g_Deposit + g_Withdraw + g_Hilo + g_Slot + g_LeaderBoard
+        g_Greetings + g_Help + g_Wallet + g_Deposit + g_Withdraw + g_Hilo + g_Slot + g_LeaderBoard,
+        reply_markup=InlineKeyboardMarkup(keyboard)
     )
+
+    return ONLYCANCEL
 
 async def board(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     await update.message.reply_text(
@@ -974,9 +1008,9 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     userId = query.from_user.id
     init(userId)
-    user = query.from_user
-    await query.answer()
-    await query.message.edit_text("You can restart to enter /start")
+
+    await start(g_UserStatus[userId]['update'], g_UserStatus[userId]['context'])
+    return CHOOSE
  
 async def end(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Cancels and ends the conversation."""
@@ -1087,6 +1121,7 @@ def main() -> None:
             PANELDEPOSIT: [MessageHandler(filters.TEXT, panelDeposit)],
             PANELWITHDRAWADDRESS: [MessageHandler(filters.TEXT, panelWithdrawAddress),
                                    CallbackQueryHandler(cancel, pattern="Cancel")],
+            ONLYCANCEL: [CallbackQueryHandler(cancel, pattern="Cancel")],
             PANELWITHDRAW: [MessageHandler(filters.TEXT, panelWithdraw),
                             CallbackQueryHandler(cancel, pattern="Cancel")],
             BETTINGHILO: [CallbackQueryHandler(_cashoutHilo, pattern="cashOutHilo"),
