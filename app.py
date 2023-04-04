@@ -980,9 +980,18 @@ async def panelWithdraw(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     )
 
 async def help(update: Update, context: CallbackContext) -> int:
+    keyboard = [
+        [
+            InlineKeyboardButton("Back", callback_data="Cancel"),
+        ]
+    ]
+
     await update.message.reply_text(
-        g_Greetings + g_Help + g_Wallet + g_Deposit + g_Withdraw + g_Hilo + g_Slot + g_LeaderBoard
+        g_Greetings + g_Help + g_Wallet + g_Deposit + g_Withdraw + g_Hilo + g_Slot + g_LeaderBoard,
+        reply_markup=InlineKeyboardMarkup(keyboard)
     )
+
+    return ONLYCANCEL
  
 async def _help(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
