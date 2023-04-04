@@ -225,6 +225,7 @@ async def wallet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     )
 
 async def _wallet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    print('_wallet')
     query = update.callback_query
     userId = query.from_user.id
 
@@ -279,12 +280,16 @@ async def _panelHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         address = wallet[0][0]
         web3 = None
         field = "ETH_Amount"
+        wagerField = "ETH_Wagered"
         tokenMode = g_UserStatus[userId]['tokenMode']
+
         if tokenMode == ETH:
             web3 = g_ETH_Web3
         else :
             web3 = g_BSC_Web3
             field = "BNB_Amount"
+            wagerField = "BNB_Wagered"
+        
         f_Balance = await getBalance(address, web3, userId)
         if float(f_Balance) <= 0:
             await query.message.edit_text(
@@ -293,13 +298,17 @@ async def _panelHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             return
     
         tokenAmount = g_UserStatus[userId]['curTokenAmount']
-        if float(f_Balance) <= float(tokenAmount):
+        if float(f_Balance) <= tokenAmount:
             tokenAmount = float(f_Balance)
             g_UserStatus[userId]['curTokenAmount'] = float(f_Balance)
         
         print(f_Balance)
         print(tokenAmount)
         await updateSetFloatWhereStr("tbl_users", field, f_Balance - tokenAmount, "UserID", userId)
+
+        previousWagered = await readFieldsWhereStr("tbl_users", wagerField, kind)
+        oldWagerAmount = float(previousWagered[0][0])
+        await updateSetFloatWhereStr("tbl_users", wagerField, oldWagerAmount + tokenAmount, "UserID", userId)
     
     cardHistory = g_UserStatus[userId]['cardHistory']
     prevCard = g_UserStatus[userId]['prevCard']
@@ -323,7 +332,7 @@ async def _panelHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             ]
         ]
         await query.message.edit_text(
-            f"{sGreeting}Current Card: {str(newCard['label'])}\n\nCashout : x{g_HiloCashOut[cashOutId]}\nCashout:" + truncDecimal(str(g_UserStatus[userId]['curTokenAmount'] * g_HiloCashOut[cashOutId])) + getUnitString(g_UserStatus[userId]['tokenMode']) + "\nWhat is your next guess? High or Low?",
+            f"{sGreeting}Current Card: {str(newCard['label'])}\n\nCashout : x{g_HiloCashOut[cashOutId]}\nCashout:" + str(g_UserStatus[userId]['curTokenAmount'] * g_HiloCashOut[cashOutId]) + getUnitString(g_UserStatus[userId]['tokenMode']) + "\nWhat is your next guess? High or Low?",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
         return BETTINGHILO
@@ -458,12 +467,14 @@ async def _cashoutHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     address = wallet[0][0]
     web3 = None
     field = "ETH_Amount"
+    winsField = "ETH_Wins"
     tokenMode = g_UserStatus[userId]['tokenMode']
     if tokenMode == ETH:
         web3 = g_ETH_Web3
     else :
         web3 = g_BSC_Web3
         field = "BNB_Amount"
+        winsField = "BNB_Wins"
     f_Balance = await getBalance(address, web3, userId)
     
     cashOutId = g_UserStatus[userId]['cashOutHiloCnt']
@@ -473,6 +484,11 @@ async def _cashoutHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     g_UserStatus[userId]['curTokenAmount'] = curTokenAmount
     profit = curTokenAmount * g_HiloCashOut[cashOutId]
     await updateSetFloatWhereStr("tbl_users", field, (f_Balance + profit), "UserID", userId)
+
+    previousWins = await readFieldsWhereStr("tbl_users", winsField, kind)
+    oldWagerAmount = float(previousWins[0][0])
+    await updateSetFloatWhereStr("tbl_users", winsField, oldWagerAmount + profit - curTokenAmount, "UserID", userId)
+
     f_Balance = await getBalance(address, web3, userId)
     keyboard = [
         [
@@ -521,12 +537,18 @@ async def _panelSlot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     address = wallet[0][0]
     web3 = None
     field = "ETH_Amount"
+    wagerField = "ETH_Wagered"
+    winsField = "ETH_Wins"
     tokenMode = g_UserStatus[userId]['tokenMode']
+
     if tokenMode == ETH:
         web3 = g_ETH_Web3
     else :
         web3 = g_BSC_Web3
         field = "BNB_Amount"
+        wagerField = "BNB_Wagered"
+        winsField = "BNB_Wins"
+    
     f_Balance = await getBalance(address, web3, userId)
     
     if float(f_Balance) <= 0:
@@ -544,6 +566,10 @@ async def _panelSlot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     print(tokenAmount)
     await updateSetFloatWhereStr("tbl_users", field, f_Balance - tokenAmount, "UserID", userId)
 
+    previousWagered = await readFieldsWhereStr("tbl_users", wagerField, kind)
+    oldWagerAmount = float(previousWagered[0][0])
+    await updateSetFloatWhereStr("tbl_users", wagerField, oldWagerAmount + tokenAmount, "UserID", userId)
+
     slot = roll()
     label = slot["label"]
     res = ""
@@ -551,6 +577,10 @@ async def _panelSlot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         wonAmount = g_UserStatus[userId]['curTokenAmount'] * g_SlotCashout
         res = "You Won " + str(wonAmount) + getUnitString(g_UserStatus[userId]['tokenMode']) + "💰"
         await updateSetFloatWhereStr("tbl_users", field, wonAmount + f_Balance, "UserID", userId)
+
+        previousWins = await readFieldsWhereStr("tbl_users", winsField, kind)
+        oldWagerAmount = float(previousWins[0][0])
+        await updateSetFloatWhereStr("tbl_users", winsField, oldWagerAmount + wonAmount - g_UserStatus[userId]['curTokenAmount'], "UserID", userId)
     else :
         res = "You lost " + str(g_UserStatus[userId]['curTokenAmount']) + " " + getUnitString(g_UserStatus[userId]['tokenMode']) + "💸"
     query: CallbackQuery = update.callback_query
