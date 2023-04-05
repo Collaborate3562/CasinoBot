@@ -19,6 +19,7 @@ import threading
 import time
 from web3 import Web3, IPCProvider
 from telegram import __version__ as TG_VER
+from pycoingecko import CoinGeckoAPI
 from dotenv.main import load_dotenv
 import os
 
@@ -72,13 +73,16 @@ from libs.util import (
     truncDecimal,
     
     #from db.py
+    getTopFieldsByLimit,
     updateSetStrWhereStr,
     updateSetFloatWhereStr,
     readFieldsWhereStr,
+    insertInitialCoinInfos,
     insertFields
 )
 
 load_dotenv()
+cg = CoinGeckoAPI()
 
 ETH_CONTRACT_ADDRESS = os.environ['ETH_CONTRACT_ADDRESS']
 BSC_CONTRACT_ADDRESS = os.environ['BSC_CONTRACT_ADDRESS']
@@ -1009,8 +1013,27 @@ async def _help(update: Update, context: CallbackContext) -> None:
     return ONLYCANCEL
 
 async def board(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    topWagers = "Top 5 Wagers"
+    topWinners = "Top 5 Winners"
+
+    ethPrice = await readFieldsWhereStr('tbl_cryptos', 'Price', 'Symbol=\'eth\'')
+    ethPrice = ethPrice[0][0]
+
+    bnbPrice = await readFieldsWhereStr('tbl_cryptos', 'Price', 'Symbol=\'bnb\'')
+    bnbPrice = bnbPrice[0][0]
+
+    topWagered = await getTopFieldsByLimit('tbl_users', f'UserName, {ethPrice} * ETH_Wagered + {bnbPrice} * BNB_Wagered AS Total_Wagered', 'Total_Wagered', 5)
+    topWins = await getTopFieldsByLimit('tbl_users', f'UserName, {ethPrice} * ETH_Wins + {bnbPrice} * BNB_Wins AS Total_Wins', 'Total_Wins', 5)
+
+    i = 0
+    while i < len(topWagered):
+        topWagers += "\n" + "@" + topWagered[i][0] + ": " + "{:.2f}".format(topWagered[i][1]) + " USD"
+        topWinners += "\n" + "@" + topWins[i][0] + ": " + "{:.2f}".format(topWins[i][1]) + " USD"
+        
+        i += 1
+
     await update.message.reply_text(
-        "Shows the order of the users who had won\n1. Thomas $999\n2. Thomas $999\n3. Thomas $999"
+        f"Shows the order of the users who had won\n\n{topWagers}\n\n{topWinners}"
     )
  
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -1051,6 +1074,7 @@ async def copyToClipboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     param = query.data.split(":")[1]
     pyperclip.copy(param)
     print('copied params', param)
+    clipboard_text = pyperclip.paste()
 
 ############################################################################
 #                       complete(1st edition)                              #
@@ -1083,6 +1107,21 @@ def getContract() -> None:
     global g_BSC_Contract
     g_BSC_Contract = g_BSC_Web3.eth.contract(address=BSC_CONTRACT_ADDRESS, abi=abi)
 
+def get_coin_price(poll_interval: int):
+    while True:
+        print('Fetch Coin Price')
+        coinIds = asyncio.run(readFieldsWhereStr('tbl_cryptos', 'CoinId', 'id > 0'))
+
+        if len(coinIds) <= 0:
+            asyncio.run(insertInitialCoinInfos())
+            coinIds = asyncio.run(readFieldsWhereStr('tbl_cryptos', 'CoinId', 'id > 0'))
+        
+        for coinId in coinIds:
+            price = cg.get_price(ids=coinId[0], vs_currencies='usd')
+            asyncio.run(updateSetFloatWhereStr('tbl_cryptos', 'Price', price[coinId[0]]['usd'], 'CoinId', coinId[0]))
+
+        time.sleep(poll_interval)
+
 def main() -> None:
     """Run the bot."""
     getWeb3()
@@ -1090,6 +1129,9 @@ def main() -> None:
 
     # Create the Application and pass it your bot's token.
     application = Application.builder().token(TOKEN).build()
+
+    thread = threading.Thread(target=get_coin_price, args=(120,), daemon=False)
+    thread.start()
 
     # Add conversation handler with the states GENDER, PHOTO, LOCATION and BIO
     conv_handler = ConversationHandler(

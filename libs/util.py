@@ -5,6 +5,8 @@ from libs.db import (
     updateSetStrWhereStr,
     updateSetFloatWhereStr,
     readFieldsWhereStr,
+    getTopFieldsByLimit,
+    insertInitialCoinInfos,
     insertFields
 )
 import datetime
@@ -23,12 +25,16 @@ g_Flowers = ['♠️', '♥️', '♣️', '♦️']
 g_Numbers = ['A','2','3','4','5','6','7','8','9','10','J','Q','K']
 
 async def getPricefromAmount(amount : float, kind : int) -> float:
-    price = 0
+    value = 0
     if kind == 0 :
-        price = amount * 1700
+        price = await readFieldsWhereStr('tbl_cryptos', 'Price', 'Symbol=\'eth\'')
+        price = price[0][0]
+        value = amount * price
     else :
-        price = amount * 300
-    return price
+        price = await readFieldsWhereStr('tbl_cryptos', 'Price', 'Symbol=\'bnb\'')
+        price = price[0][0]
+        value = amount * price
+    return value
 
 def isValidAddress(w3: any, address: str) -> bool:
     return w3.isAddress(address)

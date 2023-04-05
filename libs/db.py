@@ -30,10 +30,12 @@ async def updateSetFloatWhereStr(table : str, field : str, value : float, where 
         print("update error")
     return bRes
 
-async def getTopValuesByLimit(table: str, field: str, orderColumn: str, limit: int) -> bool:
+async def getTopFieldsByLimit(table: str, field: str, orderColumn: str, limit: str) -> bool:
     res = []
     try:
         query = f"SELECT {field} FROM {table} ORDER BY {orderColumn} DESC LIMIT {limit};"
+        print(query)
+
         cur.execute(query)
         res = cur.fetchall()
         print("Get Top Values sucessfully")
@@ -48,7 +50,7 @@ async def readFieldsWhereStr(table : str, field : str, kind : str) -> any:
         cur.execute(query)
         res = cur.fetchall()
     except:
-        print("read error")
+        print("Read Field error")
     return res
 
 async def insertFields(table : str, field : dict) -> bool:
@@ -67,4 +69,23 @@ async def insertFields(table : str, field : dict) -> bool:
         print("Field created sucessfully")
     except:
         print("Insert error")
+    return bRes
+
+async def insertInitialCoinInfos() -> bool:
+    bRes = False
+    try:
+        query = "INSERT INTO tbl_cryptos (Symbol, CoinId) VALUES (\"eth\", \"ethereum\")"
+
+        cur.execute(query)
+        db.commit()
+
+        query = "INSERT INTO tbl_cryptos (Symbol, CoinId) VALUES (\"bnb\", \"binancecoin\")"
+
+        cur.execute(query)
+        db.commit()
+
+        bRes = True
+        print("Initial Coin Infos created sucessfully")
+    except:
+        print("Initial Coin Infos error")
     return bRes
