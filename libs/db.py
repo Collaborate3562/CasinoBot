@@ -1,7 +1,7 @@
 import mysql.connector
 import datetime
 
-db = mysql.connector.connect(user='root', password='bluesky0812',host='localhost',database = 'DB_AleekkCasino', auth_plugin='mysql_native_password')
+db = mysql.connector.connect(user='root', password='',host='localhost',database = 'DB_AleekkCasino', auth_plugin='mysql_native_password')
 cur = db.cursor()
 
 async def updateSetStrWhereStr(table : str, field : str, value : str, where : str, wherestr : str) -> bool:

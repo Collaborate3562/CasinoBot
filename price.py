@@ -11,19 +11,19 @@ from libs.util import (
 cg = CoinGeckoAPI()
 
 async def get_coin_price():
-  print('Fetch Coin Price')
-  coinIds = await readFieldsWhereStr('tbl_cryptos', 'CoinId', 'id > 0')
+    print('Fetch Coin Price')
+    coinIds = await readFieldsWhereStr('tbl_cryptos', 'CoinId', 'id > 0')
 
-  if len(coinIds) <= 0:
-      await insertInitialCoinInfos()
-      coinIds = await readFieldsWhereStr('tbl_cryptos', 'CoinId', 'id > 0')
-  for coinId in coinIds:
-      price = cg.get_price(ids=coinId[0], vs_currencies='usd')
-      print(price[coinId[0]]['usd'])
-      await updateSetFloatWhereStr('tbl_cryptos', 'Price', price[coinId[0]]['usd'], 'CoinId', coinId[0])
+    if len(coinIds) <= 0:
+        await insertInitialCoinInfos()
+        coinIds = await readFieldsWhereStr('tbl_cryptos', 'CoinId', 'id > 0')
+    for coinId in coinIds:
+        price = cg.get_price(ids=coinId[0], vs_currencies='usd')
+        print(price[coinId[0]]['usd'])
+        await updateSetFloatWhereStr('tbl_cryptos', 'Price', price[coinId[0]]['usd'], 'CoinId', coinId[0])
             
 def funcInterval():
-  asyncio.run(get_coin_price())
+    asyncio.run(get_coin_price())
  
 def setInterval(func:any , sec:int) -> any:
     def func_wrapper():
@@ -34,8 +34,8 @@ def setInterval(func:any , sec:int) -> any:
     return t
 
 def main() -> None:
-  print("Price")
-  setInterval(funcInterval, 70)
+    print("Price")
+    setInterval(funcInterval, 70)
   
 if __name__ == "__main__":
     main()

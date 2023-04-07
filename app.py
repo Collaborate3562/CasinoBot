@@ -95,7 +95,7 @@ BOT_TOKEN = os.environ['BOT_TOKEN']
 OWNER_ADDRESS = os.environ['OWNER_ADDRSS']
 
 CHOOSE, WALLET, SELECT, STATUS, PAYMENT, DEPOSIT, DISPLAY, COPY, LASTSELECT, AGAINSLOT, AGAINHILO, PANELHILO, PANELSLOT, BETTINGHILO, PANELDEPOSIT, PANELWITHDRAW, PANELWITHDRAWADDRESS, CANCEL, ADSTIME, ADSPAY = range(20)
-ST_DEPOSIT, ST_WITHDRAW, ST_HILO, ST_SLOT = range(4)
+ST_DEPOSIT, ST_WITHDRAW, ST_HILO, ST_SLOT, ST_ADS_PAY = range(5)
 ETH, BNB = range(2)
 
 g_SlotMark = "🎰 SLOTS 🎰\n\n"
@@ -179,6 +179,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         "update": update,
         "context": context,
         "withdrawTokenType": ETH,
+        "adsPayTokenType": ETH,
         "withdrawAmount": float(0),
         "status" : int(0),
         "prevCard" : None,
@@ -750,6 +751,10 @@ async def funcETH(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         str_Guide = f"How much do you wanna withdraw?\nCurrent Balance : {f_Balance} ETH\ne.g /0.01"
         g_UserStatus[userId]['withdrawTokenType'] = ETH
         return await confirm_dlg_withdraw(update, str_Guide)
+    if status == ST_ADS_PAY:
+        str_Guide = f"How much do you wanna pay?\nCurrent Balance : {f_Balance} ETH\ne.g /0.01"
+        g_UserStatus[userId]['adsPayTokenType'] = ETH
+        return await confirm_dlg_withdraw(update, str_Guide)
     else :
         str_Guide = f"How much do you wanna bet?\nCurrent Balance : {f_Balance} ETH\n"
         return await confirm_dlg_game(update, context, str_Guide, userId, g_Unit_ETH, f_Balance)
@@ -773,8 +778,12 @@ async def funcBNB(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if status == ST_DEPOSIT:
         return await panelDeposit(update, context)
     if status == ST_WITHDRAW :
-        str_Guide = f"How much do you wanna withdraw?\nCurrent Balance : {f_Balance} BNB\n"
+        str_Guide = f"How much do you wanna withdraw?\nCurrent Balance : {f_Balance} BNB\ne.g /0.01"
         g_UserStatus[userId]['withdrawTokenType'] = BNB
+        return await confirm_dlg_withdraw(update, str_Guide)
+    if status == ST_ADS_PAY:
+        str_Guide = f"How much do you wanna pay?\nCurrent Balance : {f_Balance} BNB\ne.g /0.01"
+        g_UserStatus[userId]['adsPayTokenType'] = BNB
         return await confirm_dlg_withdraw(update, str_Guide)
     else :
         str_Guide = f"How much do you wanna bet?\nCurrent Balance : {f_Balance} BNB\n"
@@ -902,7 +911,7 @@ async def panelDeposit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     return COPY
 
 async def panelWithdrawAddress(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    g_UserStatus
+    global g_UserStatus
     text = update.message.text
 
     if not (len(text.split('/')) == 2 and isFloat(text.split('/')[1])):
@@ -918,7 +927,13 @@ async def panelWithdrawAddress(update: Update, context: ContextTypes.DEFAULT_TYP
     
     field = ''
     symbol= ''
-    tokenMode = g_UserStatus[userId]['withdrawTokenType']
+    tokenMode = ETH
+
+    if g_UserStatus[userId]['status'] == ST_WITHDRAW:
+        tokenMode = g_UserStatus[userId]['withdrawTokenType']
+    else:
+        tokenMode = g_UserStatus[userId]['adsPayTokenType']
+
     if tokenMode == ETH:
         field = 'ETH_Amount'
         symbol = 'ETH'
@@ -933,17 +948,31 @@ async def panelWithdrawAddress(update: Update, context: ContextTypes.DEFAULT_TYP
         )
         return
 
-    g_UserStatus[userId]['withdrawAmount'] = float(amount)
+    if g_UserStatus[userId]['status'] == ST_WITHDRAW:
+        g_UserStatus[userId]['withdrawAmount'] = float(amount)
+    else:
+        g_UserStatus[userId]['adsPayAmount'] = float(amount)
+    
     keyboard = [
         [
             InlineKeyboardButton("Cancel", callback_data="Cancel"),
         ]
     ]
-    await update.message.reply_text(
-        "Please enter your wallet address to withdraw\ne.g /0x43cbE0ce689dbC237A517EFAAe7B8c290C4e64df",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
-    return PANELWITHDRAW
+
+    if g_UserStatus[userId]['status'] == ST_WITHDRAW:
+        await update.message.reply_text(
+            "Please enter your wallet address to withdraw\ne.g /0x43cbE0ce689dbC237A517EFAAe7B8c290C4e64df",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return PANELWITHDRAW
+    else:
+        amount = float(balance[0][0]) - float(amount)
+
+        await updateSetFloatWhereStr("tbl_users", field, amount, "UserID", userId)
+        await update.message.reply_text(
+            "Booked your ads successfully\nYour current balance is {} {}\n/start".format(float(amount), symbol),
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
 
 async def panelWithdraw(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     g_UserStatus
@@ -1047,8 +1076,15 @@ async def _adsTime(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def _adsPay(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
+    userId = query.from_user.id
     param = query.data.split(":")[1]
-    print(f"_adsPay {param}")
+    print(userId, f"_adsPay {param}")
+    
+    global g_UserStatus
+    g_UserStatus[userId]['status'] = ST_ADS_PAY
+    
+    str_Guide = "Which token do you wanna pay?\n"
+    return await _eth_bnb_dlg(update, str_Guide)
 
 ########################################################################
 #                               +board                                 #
