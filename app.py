@@ -17,9 +17,9 @@ import logging
 import pyperclip
 import threading
 import time
+# import telegram
 from web3 import Web3, IPCProvider
 from telegram import __version__ as TG_VER
-from pycoingecko import CoinGeckoAPI
 from dotenv.main import load_dotenv
 import os
 
@@ -40,7 +40,7 @@ from telegram import (
     Update, 
     InlineKeyboardButton, 
     InlineKeyboardMarkup, 
-    CallbackQuery
+    CallbackQuery,
 )
 
 from telegram.ext import (
@@ -71,6 +71,9 @@ from libs.util import (
     isFloat,
     isValidContractOrWallet,
     truncDecimal,
+    truncDecimal7,
+
+    g_SlotCashOut,
     
     #from db.py
     getTopFieldsByLimit,
@@ -82,7 +85,6 @@ from libs.util import (
 )
 
 load_dotenv()
-cg = CoinGeckoAPI()
 
 ETH_CONTRACT_ADDRESS = os.environ['ETH_CONTRACT_ADDRESS']
 BSC_CONTRACT_ADDRESS = os.environ['BSC_CONTRACT_ADDRESS']
@@ -92,13 +94,12 @@ INFURA_ID = os.environ['INFURA_ID']
 BOT_TOKEN = os.environ['BOT_TOKEN']
 OWNER_ADDRESS = os.environ['OWNER_ADDRSS']
 
-CHOOSE, WALLET, SELECT, STATUS, PAYMENT, DEPOSIT, DISPLAY, COPY, LASTSELECT, AGAINSLOT, AGAINHILO, PANELHILO, PANELSLOT, BETTINGHILO, PANELDEPOSIT, PANELWITHDRAW, PANELWITHDRAWADDRESS, ONLYCANCEL = range(18)
+CHOOSE, WALLET, SELECT, STATUS, PAYMENT, DEPOSIT, DISPLAY, COPY, LASTSELECT, AGAINSLOT, AGAINHILO, PANELHILO, PANELSLOT, BETTINGHILO, PANELDEPOSIT, PANELWITHDRAW, PANELWITHDRAWADDRESS, CANCEL, ADSTIME, ADSPAY = range(20)
 ST_DEPOSIT, ST_WITHDRAW, ST_HILO, ST_SLOT = range(4)
 ETH, BNB = range(2)
 
 g_SlotMark = "🎰 SLOTS 🎰\n\n"
 g_HiloMark = "♠️♥️ HILO ♦️♣️\n\n"
-g_Cashout = 0 #TODO
 g_UserStatus = {}
 # Test Token
 TOKEN = BOT_TOKEN
@@ -107,8 +108,12 @@ g_Help = f"/help - Describe all guide\n"
 g_Wallet = f"/wallet - Show all balances in your wallet\n"
 g_Deposit = f"/deposit - Deposit ETH or BNB into your wallet\n"
 g_Withdraw = f"/withdraw - Withdraw ETH or BNB from your wallet\n"
-g_Hilo = f"/hilo - Play hilo casino game\n"
-g_Slot = f"/slot - Play slot casino game\n"
+g_Hilo = f"/hilo - Play hilo casino game\n  "
+g_SlotHelp1 = f"   Three 7 symbols\n     7️⃣ | 7️⃣ |7️⃣ => x{g_SlotCashOut[0]}\n"
+g_SlotHelp2 = f"   Any three of a kind\n    🍎 | 🍎 | 🍎 => x{g_SlotCashOut[1]}\n"
+g_SlotHelp3 = f"   Any pair of 7 symbol\n    7️⃣ | 🌺 | 7️⃣ => x{g_SlotCashOut[2]}\n"
+g_SlotHelp4 = f"   Any 7 symbols\n  🍌 | 🍎 | 7️⃣ => x{g_SlotCashOut[3]}\n"
+g_Slot = f"/slot - Play slot casino game\n" + g_SlotHelp1 + g_SlotHelp2 + g_SlotHelp3 + g_SlotHelp4
 g_LeaderBoard = f"/board - Show the leaderboard\n"
 g_Unit_ETH = 0.0005
 g_Unit_BNB = 0.003
@@ -118,6 +123,8 @@ g_ETH_Web3 = None
 g_BSC_Web3 = None
 g_ETH_Contract = None
 g_BSC_Contract = None
+g_AdsBtns = ['6PM UTC','7PM UTC','8PM UTC','9PM UTC']
+g_AdsPayButton = ['2 HOURS ( X ETH/BNB )','4 HOURS ( X ETH/BNB )','8 HOURS ( X ETH/BNB )','12 HOURS ( X ETH/BNB )','24 HOURS ( X ETH/BNB )']
 # Enable logging
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
@@ -198,6 +205,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             InlineKeyboardButton("Play Slot", callback_data="Play Slot"),
         ],
         [
+            InlineKeyboardButton("LeaderBoard", callback_data="Board"),
             InlineKeyboardButton("Help", callback_data="Help"),
         ]
     ]
@@ -235,7 +243,7 @@ async def wallet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-    return ONLYCANCEL
+    return CANCEL
 
 async def _wallet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     print('_wallet')
@@ -263,7 +271,7 @@ async def _wallet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-    return ONLYCANCEL
+    return CANCEL
 
 ########################################################################
 #                            +High - Low                               #
@@ -325,7 +333,7 @@ async def _panelHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
 
-            return ONLYCANCEL & CHOOSE
+            return CANCEL & CHOOSE
     
         tokenAmount = g_UserStatus[userId]['curTokenAmount']
         if float(f_Balance) <= tokenAmount:
@@ -601,18 +609,20 @@ async def _panelSlot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     await updateSetFloatWhereStr("tbl_users", wagerField, oldWagerAmount + tokenAmount, "UserID", userId)
 
     slot = roll()
+    print(slot)
     label = slot["label"]
     res = ""
     if slot["value"] == True:
-        wonAmount = g_UserStatus[userId]['curTokenAmount'] * g_SlotCashout
-        res = "You Won " + str(wonAmount) + getUnitString(g_UserStatus[userId]['tokenMode']) + "💰"
+        cashout = slot["cashout"]
+        wonAmount = g_UserStatus[userId]['curTokenAmount'] * cashout
+        res = "You Won " + truncDecimal7(wonAmount) + getUnitString(g_UserStatus[userId]['tokenMode']) + f"💰\nCashout : x{cashout}"
         await updateSetFloatWhereStr("tbl_users", field, wonAmount + f_Balance, "UserID", userId)
 
         previousWins = await readFieldsWhereStr("tbl_users", winsField, kind)
         oldWagerAmount = float(previousWins[0][0])
         await updateSetFloatWhereStr("tbl_users", winsField, oldWagerAmount + wonAmount - g_UserStatus[userId]['curTokenAmount'], "UserID", userId)
     else :
-        res = "You lost " + str(g_UserStatus[userId]['curTokenAmount']) + " " + getUnitString(g_UserStatus[userId]['tokenMode']) + "💸"
+        res = "\nYou lost " + str(g_UserStatus[userId]['curTokenAmount']) + " " + getUnitString(g_UserStatus[userId]['tokenMode']) + "💸"
     query: CallbackQuery = update.callback_query
     keyboard = [
         [
@@ -621,7 +631,6 @@ async def _panelSlot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             InlineKeyboardButton("Cancel", callback_data="Cancel"),
         ]
     ]
-
     await query.message.edit_text(
         f"{g_SlotMark}{label}\n\n{res}\n",
         reply_markup=InlineKeyboardMarkup(keyboard)
@@ -995,7 +1004,7 @@ async def help(update: Update, context: CallbackContext) -> int:
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-    return ONLYCANCEL
+    return CANCEL
  
 async def _help(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
@@ -1010,11 +1019,44 @@ async def _help(update: Update, context: CallbackContext) -> None:
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-    return ONLYCANCEL
+    return CANCEL
 
+########################################################################
+#                             +advertise                               #
+########################################################################
+async def _adsTime(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    param = query.data.split(":")[1]
+    print(f"_adsTime {param}")
+    keyboard = []
+    btnHome = [ InlineKeyboardButton("Home", callback_data="Cancel") ]
+
+    id = 0
+    for payBtn in g_AdsPayButton:
+        callbackData = "adsPay:" + str(id)
+        boardButton = [ InlineKeyboardButton(payBtn, callback_data=callbackData) ]
+        keyboard.append(boardButton)
+        id += 1
+    keyboard.append(btnHome)
+
+    await query.message.edit_text(
+        f"👉📒 Please book you want",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+    return ADSPAY
+
+async def _adsPay(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    param = query.data.split(":")[1]
+    print(f"_adsPay {param}")
+
+########################################################################
+#                               +board                                 #
+########################################################################
 async def board(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    topWagers = "Top 5 Wagers"
-    topWinners = "Top 5 Winners"
+    topWagers = "📈 Top 5 Wagers 📉"
+    topWinners = "🏆 Top 5 Winners 🎊"
+    advertise = "👉📃 Book the ads at the following time"
 
     ethPrice = await readFieldsWhereStr('tbl_cryptos', 'Price', 'Symbol=\'eth\'')
     ethPrice = ethPrice[0][0]
@@ -1032,10 +1074,63 @@ async def board(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         
         i += 1
 
+    keyboard = []
+    btnHome = [ InlineKeyboardButton("Home", callback_data="Cancel") ]
+
+    id = 0
+    for adsBtn in g_AdsBtns:
+        callbackData = "adsTime:" + str(id)
+        boardButton = [ InlineKeyboardButton(adsBtn, callback_data=callbackData) ]
+        keyboard.append(boardButton)
+        id += 1
+    keyboard.append(btnHome)
+        
     await update.message.reply_text(
-        f"Shows the order of the users who had won\n\n{topWagers}\n\n{topWinners}"
+        f"---📜 Leaderboards 🧮---\n\n{topWinners}\n\n{topWagers}\n\n\n{advertise}",
+        reply_markup=InlineKeyboardMarkup(keyboard)
     )
- 
+    return ADSTIME
+
+async def _board(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    topWagers = "📈 Top 5 Wagers 📉"
+    topWinners = "🏆 Top 5 Winners 🎊"
+    advertise = "👉📃 Book the ads at the following time"
+
+    ethPrice = await readFieldsWhereStr('tbl_cryptos', 'Price', 'Symbol=\'eth\'')
+    ethPrice = ethPrice[0][0]
+
+    bnbPrice = await readFieldsWhereStr('tbl_cryptos', 'Price', 'Symbol=\'bnb\'')
+    bnbPrice = bnbPrice[0][0]
+
+    topWagered = await getTopFieldsByLimit('tbl_users', f'UserName, {ethPrice} * ETH_Wagered + {bnbPrice} * BNB_Wagered AS Total_Wagered', 'Total_Wagered', 5)
+    topWins = await getTopFieldsByLimit('tbl_users', f'UserName, {ethPrice} * ETH_Wins + {bnbPrice} * BNB_Wins AS Total_Wins', 'Total_Wins', 5)
+
+    i = 0
+    while i < len(topWagered):
+        topWagers += "\n" + "@" + topWagered[i][0] + ": " + "{:.2f}".format(topWagered[i][1]) + " USD"
+        topWinners += "\n" + "@" + topWins[i][0] + ": " + "{:.2f}".format(topWins[i][1]) + " USD"
+        
+        i += 1
+
+    keyboard = []
+    btnHome = [ InlineKeyboardButton("Home", callback_data="Cancel") ]
+
+    id = 0
+    for adsBtn in g_AdsBtns:
+        callbackData = "adsTime:" + str(id)
+        boardButton = [ InlineKeyboardButton(adsBtn, callback_data=callbackData) ]
+        keyboard.append(boardButton)
+        id += 1
+    keyboard.append(btnHome)
+
+    query = update.callback_query
+    # await context.bot.send_chat_action(query.message.chat_id, telegram.ChatAction.TYPING)
+    await query.message.edit_text(
+        f"---📜 Leaderboards 🧮---\n\n{topWinners}\n\n{topWagers}\n\n\n{advertise}",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+    return ADSTIME
+
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     userId = query.from_user.id
@@ -1107,20 +1202,6 @@ def getContract() -> None:
     global g_BSC_Contract
     g_BSC_Contract = g_BSC_Web3.eth.contract(address=BSC_CONTRACT_ADDRESS, abi=abi)
 
-def get_coin_price(poll_interval: int):
-    while True:
-        print('Fetch Coin Price')
-        coinIds = asyncio.run(readFieldsWhereStr('tbl_cryptos', 'CoinId', 'id > 0'))
-
-        if len(coinIds) <= 0:
-            asyncio.run(insertInitialCoinInfos())
-            coinIds = asyncio.run(readFieldsWhereStr('tbl_cryptos', 'CoinId', 'id > 0'))
-        
-        for coinId in coinIds:
-            price = cg.get_price(ids=coinId[0], vs_currencies='usd')
-            asyncio.run(updateSetFloatWhereStr('tbl_cryptos', 'Price', price[coinId[0]]['usd'], 'CoinId', coinId[0]))
-
-        time.sleep(poll_interval)
 
 def main() -> None:
     """Run the bot."""
@@ -1129,9 +1210,6 @@ def main() -> None:
 
     # Create the Application and pass it your bot's token.
     application = Application.builder().token(TOKEN).build()
-
-    thread = threading.Thread(target=get_coin_price, args=(120,), daemon=False)
-    thread.start()
 
     # Add conversation handler with the states GENDER, PHOTO, LOCATION and BIO
     conv_handler = ConversationHandler(
@@ -1150,6 +1228,7 @@ def main() -> None:
                      CallbackQueryHandler(_wallet, pattern="Balance"),
                      CallbackQueryHandler(_playHilo, pattern="Play Hilo"),
                      CallbackQueryHandler(_playSlot, pattern="Play Slot"),
+                     CallbackQueryHandler(_board, pattern="Board"),
                      CallbackQueryHandler(_help, pattern="Help")],
             DEPOSIT: [MessageHandler(filters.TEXT, deposit)],
             COPY: [CallbackQueryHandler(copyToClipboard, pattern="^copyToClipboard:"),
@@ -1170,7 +1249,11 @@ def main() -> None:
             PANELDEPOSIT: [MessageHandler(filters.TEXT, panelDeposit)],
             PANELWITHDRAWADDRESS: [MessageHandler(filters.TEXT, panelWithdrawAddress),
                                    CallbackQueryHandler(cancel, pattern="Cancel")],
-            ONLYCANCEL: [CallbackQueryHandler(cancel, pattern="Cancel")],
+            CANCEL: [CallbackQueryHandler(cancel, pattern="Cancel")],
+            ADSTIME: [CallbackQueryHandler(_adsTime, pattern="^adsTime:"),
+                         CallbackQueryHandler(cancel, pattern="Cancel")],
+            ADSPAY: [CallbackQueryHandler(_adsPay, pattern="^adsPay:"),
+                         CallbackQueryHandler(cancel, pattern="Cancel")],
             PANELWITHDRAW: [MessageHandler(filters.TEXT, panelWithdraw),
                             CallbackQueryHandler(cancel, pattern="Cancel")],
             BETTINGHILO: [CallbackQueryHandler(_cashoutHilo, pattern="cashOutHilo"),
