@@ -28,6 +28,7 @@ g_Flowers = ['♠️', '♥️', '♣️', '♦️']
 g_Numbers = ['A','2','3','4','5','6','7','8','9','10','J','Q','K']
 g_SlotCashOut = [18.0, 3.0, 1.3, 1.05]
 g_CntSymbol = 6
+
 async def getPricefromAmount(amount : float, kind : int) -> float:
     value = 0
     if kind == 0 :
@@ -334,6 +335,29 @@ async def withdrawAmount(web3: any, contract: any, withdrawalAddress: str, amoun
         return res
     return res
 
+async def calculateWithdrawFee(web3: any, amount: float, userId: str) -> float:
+    res = float(0)
+    try:
+        price = 0
+        chain_id = web3.eth.chain_id
+        if chain_id == int(ETH_TESTNET_ID):
+            price = await readFieldsWhereStr('tbl_cryptos', 'Price', 'Symbol=\'eth\'')
+            price = price[0][0]
+
+            withdrawalFee = float(1) / price
+            print('withdrawalFee', withdrawalFee)
+        else:
+            price = await readFieldsWhereStr('tbl_cryptos', 'Price', 'Symbol=\'bnb\'')
+            price = price[0][0]
+
+            withdrawalFee = float(0.3) / price
+            print('withdrawalFee', withdrawalFee)
+
+    except:
+        print("Calculate fee error")
+        return res
+    return res
+
 def _getRandCard(CardHistory : str) -> dict:
     d = dict()
     random.seed(random.randint(1, 1000))
@@ -415,7 +439,7 @@ def setInterval(func:any , sec:int) -> any:
     return t
 
 def main() -> None:
-  setInterval(funcInterval, 0.1)
+    setInterval(funcInterval, 0.1)
   
 if __name__ == "__main__":
     main()

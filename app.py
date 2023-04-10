@@ -94,7 +94,7 @@ INFURA_ID = os.environ['INFURA_ID']
 BOT_TOKEN = os.environ['BOT_TOKEN']
 OWNER_ADDRESS = os.environ['OWNER_ADDRSS']
 
-CHOOSE, WALLET, SELECT, STATUS, PAYMENT, DEPOSIT, DISPLAY, COPY, LASTSELECT, AGAINSLOT, AGAINHILO, PANELHILO, PANELSLOT, BETTINGHILO, PANELDEPOSIT, PANELWITHDRAW, PANELWITHDRAWADDRESS, CANCEL, ADSTIME, ADSPAY = range(20)
+MAIN, WALLET, SELECT, STATUS, PAYMENT, DEPOSIT, DISPLAY, COPY, LASTSELECT, AGAINSLOT, AGAINHILO, PANELHILO, PANELSLOT, BETTINGHILO, PANELDEPOSIT, PANELWITHDRAW, PANELWITHDRAWADDRESS, PANELADVERTISE, CANCEL, ADSTIME, ADSURL, ADSDESC, ADSCONFIRM, ADSPAY = range(24)
 ST_DEPOSIT, ST_WITHDRAW, ST_HILO, ST_SLOT, ST_ADS_PAY = range(5)
 ETH, BNB = range(2)
 
@@ -115,6 +115,7 @@ g_SlotHelp3 = f"   Any pair of 7 symbol\n    7️⃣ | 🌺 | 7️⃣ => x{g_Slo
 g_SlotHelp4 = f"   Any 7 symbols\n  🍌 | 🍎 | 7️⃣ => x{g_SlotCashOut[3]}\n"
 g_Slot = f"/slot - Play slot casino game\n" + g_SlotHelp1 + g_SlotHelp2 + g_SlotHelp3 + g_SlotHelp4
 g_LeaderBoard = f"/board - Show the leaderboard\n"
+g_AdsBoard = f"/advertise - Show the ads at the time\n"
 g_Unit_ETH = 0.0005
 g_Unit_BNB = 0.003
 g_SlotCashout = 1.9
@@ -125,6 +126,8 @@ g_ETH_Contract = None
 g_BSC_Contract = None
 g_AdsBtns = ['6PM UTC','7PM UTC','8PM UTC','9PM UTC']
 g_AdsPayButton = ['2 HOURS ( X ETH/BNB )','4 HOURS ( X ETH/BNB )','8 HOURS ( X ETH/BNB )','12 HOURS ( X ETH/BNB )','24 HOURS ( X ETH/BNB )']
+g_AdsURL = ""
+g_AdsDesc = ""
 # Enable logging
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
@@ -207,6 +210,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         ],
         [
             InlineKeyboardButton("LeaderBoard", callback_data="Board"),
+            InlineKeyboardButton("ADS", callback_data="advertise"),
+        ],
+        [
             InlineKeyboardButton("Help", callback_data="Help"),
         ]
     ]
@@ -215,7 +221,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-    return CHOOSE
+    return MAIN
 
 ########################################################################
 #                              +Wallet                                 #
@@ -273,7 +279,6 @@ async def _wallet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     )
 
     return CANCEL
-
 ########################################################################
 #                            +High - Low                               #
 ########################################################################
@@ -334,7 +339,7 @@ async def _panelHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
 
-            return CANCEL & CHOOSE
+            return CANCEL & MAIN
     
         tokenAmount = g_UserStatus[userId]['curTokenAmount']
         if float(f_Balance) <= tokenAmount:
@@ -1029,7 +1034,7 @@ async def help(update: Update, context: CallbackContext) -> int:
     ]
 
     await update.message.reply_text(
-        g_Greetings + g_Help + g_Wallet + g_Deposit + g_Withdraw + g_Hilo + g_Slot + g_LeaderBoard,
+        g_Greetings + g_Help + g_Wallet + g_Deposit + g_Withdraw + g_Hilo + g_Slot + g_LeaderBoard + g_AdsBoard,
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
@@ -1044,7 +1049,7 @@ async def _help(update: Update, context: CallbackContext) -> None:
         ]
     ]
     await query.message.edit_text(
-        g_Greetings + g_Help + g_Wallet + g_Deposit + g_Withdraw + g_Hilo + g_Slot + g_LeaderBoard,
+        g_Greetings + g_Help + g_Wallet + g_Deposit + g_Withdraw + g_Hilo + g_Slot + g_LeaderBoard + g_AdsBoard,
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
@@ -1053,10 +1058,65 @@ async def _help(update: Update, context: CallbackContext) -> None:
 ########################################################################
 #                             +advertise                               #
 ########################################################################
-async def _adsTime(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def adsBoard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    userInfo = update.message.from_user
+    userId = userInfo['id']
+    userName = userInfo['username']
+
+    print('{} is watching ADS board, his user ID: {} '.format(userName, userId))
+    # kind = "UserID=\"{}\"".format(userId)
+
+    keyboard = []
+    btnHome = [ InlineKeyboardButton("Home", callback_data="Cancel") ]
+
+    id = 0
+    for adsBtn in g_AdsBtns:
+        callbackData = "adsTime:" + str(id)
+        boardButton = [ InlineKeyboardButton(adsBtn, callback_data=callbackData) ]
+        keyboard.append(boardButton)
+        id += 1
+    keyboard.append(btnHome)
+
+    advertise = "👉📃 Book the ads at the following time"
+    await update.message.reply_text(
+        f"{advertise}",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+    return ADSTIME
+
+async def _adsBoard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    print('_adsBoard')
     query = update.callback_query
-    param = query.data.split(":")[1]
-    print(f"_adsTime {param}")
+    userId = query.from_user.id
+
+    print('{} is watching ADS board'.format(userId))
+
+    # kind = "UserID=\"{}\"".format(userId)
+    keyboard = []
+    btnHome = [ InlineKeyboardButton("Home", callback_data="Cancel") ]
+
+    id = 0
+    for adsBtn in g_AdsBtns:
+        callbackData = "adsTime:" + str(id)
+        boardButton = [ InlineKeyboardButton(adsBtn, callback_data=callbackData) ]
+        keyboard.append(boardButton)
+        id += 1
+    keyboard.append(btnHome)
+
+    advertise = "👉📃 Book the ads at the following time"
+    await query.message.edit_text(
+        f"{advertise}",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+    return ADSTIME
+
+async def _adsConfirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    print("==>ADS Step 4")
+    query = update.callback_query
+    userId = query.from_user.id
+
     keyboard = []
     btnHome = [ InlineKeyboardButton("Home", callback_data="Cancel") ]
 
@@ -1069,10 +1129,68 @@ async def _adsTime(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     keyboard.append(btnHome)
 
     await query.message.edit_text(
-        f"👉📒 Please book you want",
+        f"Please select your ad duration",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
     return ADSPAY
+
+async def adsDesc(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    print("==>ADS Step 3")
+    userId = update.message.from_user['id']
+    text = update.message.text
+
+    #If desc ...
+    desc = text.split('/')[1]
+    global g_AdsDesc
+    g_AdsDesc = desc
+    keyboard = [
+        [
+            InlineKeyboardButton("Confirm", callback_data="adsConfirm"),
+            InlineKeyboardButton("Cancel", callback_data="Cancel"),
+        ]
+    ]
+    await update.message.reply_text(
+        f"Your ad will be showed on leaderboard, like this\n\n{g_AdsURL}\n{g_AdsDesc}\n\nPlease confirm your ad before payment",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+    return ADSCONFIRM
+    
+async def adsUrl(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    print("==>ADS Step 2")
+    userId = update.message.from_user['id']
+    text = update.message.text
+
+    #If url ...
+    url = text.split('/')[1]
+    global g_AdsURL
+    g_AdsURL = url
+    keyboard = [
+        [
+            InlineKeyboardButton("Back", callback_data="Cancel"),
+        ]
+    ]
+    await update.message.reply_text(
+        f"Your ad URL is\n{g_AdsURL}\n👉📖Kindly submit your ad text\n    Limited to 30 characters maximum.\n   e.g /Lorem spreum..",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+    return ADSDESC 
+
+async def _adsTime(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    print("==>ADS Step 1")
+    query = update.callback_query
+    param = query.data.split(":")[1]
+    print(f"_adsTime {param}")
+    keyboard = []
+    btnHome = [ InlineKeyboardButton("Home", callback_data="Cancel") ]
+
+    keyboard.append(btnHome)
+
+    await query.message.edit_text(
+        f"👉🔗 Please submit the URL to be featured in the ad.\n    e.g /telegram.org",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+    return ADSURL
 
 async def _adsPay(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
@@ -1092,7 +1210,9 @@ async def _adsPay(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def board(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     topWagers = "📈 Top 5 Wagers 📉"
     topWinners = "🏆 Top 5 Winners 🎊"
-    advertise = "👉📃 Book the ads at the following time"
+
+    #get all adsContent from database
+    adsContent = "All ads will be showed here..."
 
     ethPrice = await readFieldsWhereStr('tbl_cryptos', 'Price', 'Symbol=\'eth\'')
     ethPrice = ethPrice[0][0]
@@ -1110,27 +1230,24 @@ async def board(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         
         i += 1
 
-    keyboard = []
-    btnHome = [ InlineKeyboardButton("Home", callback_data="Cancel") ]
-
-    id = 0
-    for adsBtn in g_AdsBtns:
-        callbackData = "adsTime:" + str(id)
-        boardButton = [ InlineKeyboardButton(adsBtn, callback_data=callbackData) ]
-        keyboard.append(boardButton)
-        id += 1
-    keyboard.append(btnHome)
+    keyboard = [
+        [ 
+            InlineKeyboardButton("Home", callback_data="Cancel") 
+        ]
+    ]
         
     await update.message.reply_text(
-        f"---📜 Leaderboards 🧮---\n\n{topWinners}\n\n{topWagers}\n\n\n{advertise}",
+        f"---📜 Leaderboards 🧮---\n\n{topWinners}\n\n{topWagers}\n\n\n{adsContent}",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
-    return ADSTIME
+    return CANCEL
 
 async def _board(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     topWagers = "📈 Top 5 Wagers 📉"
     topWinners = "🏆 Top 5 Winners 🎊"
-    advertise = "👉📃 Book the ads at the following time"
+
+    #get all adsContent from database
+    adsContent = "All ads will be showed here..."
 
     ethPrice = await readFieldsWhereStr('tbl_cryptos', 'Price', 'Symbol=\'eth\'')
     ethPrice = ethPrice[0][0]
@@ -1148,24 +1265,19 @@ async def _board(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         
         i += 1
 
-    keyboard = []
-    btnHome = [ InlineKeyboardButton("Home", callback_data="Cancel") ]
-
-    id = 0
-    for adsBtn in g_AdsBtns:
-        callbackData = "adsTime:" + str(id)
-        boardButton = [ InlineKeyboardButton(adsBtn, callback_data=callbackData) ]
-        keyboard.append(boardButton)
-        id += 1
-    keyboard.append(btnHome)
+    keyboard = [
+        [ 
+            InlineKeyboardButton("Home", callback_data="Cancel") 
+        ]
+    ]
 
     query = update.callback_query
     # await context.bot.send_chat_action(query.message.chat_id, telegram.ChatAction.TYPING)
     await query.message.edit_text(
-        f"---📜 Leaderboards 🧮---\n\n{topWinners}\n\n{topWagers}\n\n\n{advertise}",
+        f"---📜 Leaderboards 🧮---\n\n{topWinners}\n\n{topWagers}\n\n\n{adsContent}",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
-    return ADSTIME
+    return CANCEL
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
@@ -1173,7 +1285,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     init(userId)
 
     await start(g_UserStatus[userId]['update'], g_UserStatus[userId]['context'])
-    return CHOOSE
+    return MAIN
  
 async def end(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Cancels and ends the conversation."""
@@ -1256,45 +1368,53 @@ def main() -> None:
                       CommandHandler("slot", playSlot),
                       CommandHandler("withdraw", withdraw),
                       CommandHandler("board", board),
-                      CommandHandler("deposit", deposit)],
+                      CommandHandler("deposit", deposit),
+                      CommandHandler("advertise", adsBoard)],
         states={
-            WALLET: [MessageHandler("wallet", wallet)],
-            CHOOSE: [CallbackQueryHandler(_deposit, pattern="Deposit"),
-                     CallbackQueryHandler(_withdraw, pattern="Withdraw"),
-                     CallbackQueryHandler(_wallet, pattern="Balance"),
-                     CallbackQueryHandler(_playHilo, pattern="Play Hilo"),
-                     CallbackQueryHandler(_playSlot, pattern="Play Slot"),
-                     CallbackQueryHandler(_board, pattern="Board"),
-                     CallbackQueryHandler(_help, pattern="Help")],
-            DEPOSIT: [MessageHandler(filters.TEXT, deposit)],
-            COPY: [CallbackQueryHandler(copyToClipboard, pattern="^copyToClipboard:"),
-                   CallbackQueryHandler(cancel, pattern="Cancel")],
-            SELECT: [CallbackQueryHandler(funcETH, pattern="funcETH"),
-                     CallbackQueryHandler(funcBNB, pattern="funcBNB"),
-                     CallbackQueryHandler(cancel, pattern="Cancel")],
-            LASTSELECT : [CallbackQueryHandler(_changeBetAmount, pattern="^changeBetAmount:"),
-                          CallbackQueryHandler(cancel, pattern="Cancel"),
-                          CallbackQueryHandler(_panelHilo, pattern="Play"),
-                          CallbackQueryHandler(_panelSlot, pattern="Roll")],
-            AGAINSLOT: [CallbackQueryHandler(cancel, pattern="Cancel"),
-                        CallbackQueryHandler(_panelSlot, pattern="againSlot"),
-                        CallbackQueryHandler(_playSlot, pattern="changeBet"),],
-            AGAINHILO: [CallbackQueryHandler(cancel, pattern="Cancel"),
-                        CallbackQueryHandler(_panelHilo, pattern="againHilo"),
-                        CallbackQueryHandler(_playHilo, pattern="changeBet")],
-            PANELDEPOSIT: [MessageHandler(filters.TEXT, panelDeposit)],
+            MAIN:           [CallbackQueryHandler(_deposit, pattern="Deposit"),
+                            CallbackQueryHandler(_withdraw, pattern="Withdraw"),
+                            CallbackQueryHandler(_wallet, pattern="Balance"),
+                            CallbackQueryHandler(_playHilo, pattern="Play Hilo"),
+                            CallbackQueryHandler(_playSlot, pattern="Play Slot"),
+                            CallbackQueryHandler(_board, pattern="Board"),
+                            CallbackQueryHandler(_adsBoard, pattern="advertise"),
+                            CallbackQueryHandler(_help, pattern="Help")],
+            WALLET:         [MessageHandler("wallet", wallet)],
+            DEPOSIT:        [MessageHandler(filters.TEXT, deposit)],
+            SELECT:         [CallbackQueryHandler(funcETH, pattern="funcETH"),
+                            CallbackQueryHandler(funcBNB, pattern="funcBNB"),
+                            CallbackQueryHandler(cancel, pattern="Cancel")],
+            LASTSELECT :    [CallbackQueryHandler(_changeBetAmount, pattern="^changeBetAmount:"),
+                            CallbackQueryHandler(cancel, pattern="Cancel"),
+                            CallbackQueryHandler(_panelHilo, pattern="Play"),
+                            CallbackQueryHandler(_panelSlot, pattern="Roll")],
+            AGAINSLOT:      [CallbackQueryHandler(cancel, pattern="Cancel"),
+                            CallbackQueryHandler(_panelSlot, pattern="againSlot"),
+                            CallbackQueryHandler(_playSlot, pattern="changeBet"),],
+            AGAINHILO:      [CallbackQueryHandler(cancel, pattern="Cancel"),
+                            CallbackQueryHandler(_panelHilo, pattern="againHilo"),
+                            CallbackQueryHandler(_playHilo, pattern="changeBet")],
+            PANELDEPOSIT:   [MessageHandler(filters.TEXT, panelDeposit)],
+            CANCEL:         [CallbackQueryHandler(cancel, pattern="Cancel")],
+            ADSTIME:        [CallbackQueryHandler(_adsTime, pattern="^adsTime:"),
+                            CallbackQueryHandler(cancel, pattern="Cancel")],
+            ADSURL:         [MessageHandler(filters.TEXT, adsUrl),
+                            CallbackQueryHandler(cancel, pattern="Cancel")],
+            ADSDESC:        [MessageHandler(filters.TEXT, adsDesc),
+                            CallbackQueryHandler(cancel, pattern="Cancel")],
+            ADSCONFIRM:     [CallbackQueryHandler(_adsConfirm, pattern="adsConfirm"),
+                            CallbackQueryHandler(cancel, pattern="Cancel")],
+            ADSPAY:         [CallbackQueryHandler(_adsPay, pattern="^adsPay:"),
+                            CallbackQueryHandler(cancel, pattern="Cancel")],
             PANELWITHDRAWADDRESS: [MessageHandler(filters.TEXT, panelWithdrawAddress),
                                    CallbackQueryHandler(cancel, pattern="Cancel")],
-            CANCEL: [CallbackQueryHandler(cancel, pattern="Cancel")],
-            ADSTIME: [CallbackQueryHandler(_adsTime, pattern="^adsTime:"),
-                         CallbackQueryHandler(cancel, pattern="Cancel")],
-            ADSPAY: [CallbackQueryHandler(_adsPay, pattern="^adsPay:"),
-                         CallbackQueryHandler(cancel, pattern="Cancel")],
             PANELWITHDRAW: [MessageHandler(filters.TEXT, panelWithdraw),
                             CallbackQueryHandler(cancel, pattern="Cancel")],
-            BETTINGHILO: [CallbackQueryHandler(_cashoutHilo, pattern="cashOutHilo"),
-                          CallbackQueryHandler(_high, pattern="High"),
-                          CallbackQueryHandler(_low, pattern="Low"),]
+            BETTINGHILO:    [CallbackQueryHandler(_cashoutHilo, pattern="cashOutHilo"),
+                            CallbackQueryHandler(_high, pattern="High"),
+                            CallbackQueryHandler(_low, pattern="Low"),],
+            COPY:           [CallbackQueryHandler(copyToClipboard, pattern="^copyToClipboard:"),
+                            CallbackQueryHandler(cancel, pattern="Cancel")]
         },
         fallbacks=[CommandHandler("end", end)],
         allow_reentry=True,
