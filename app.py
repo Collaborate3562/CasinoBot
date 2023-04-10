@@ -193,7 +193,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         "update": update,
         "context": context,
         "withdrawTokenType": ETH,
-        "adsPayTokenType": ETH,
+        "advertise": {
+            "time": int(0),
+            "duration": int(0),
+            "url": "",
+            "content": "",
+            "adsPayTokenType": ETH,
+            "adsPayTokenAmount": float(0)
+        },
         "withdrawAmount": float(0),
         "status" : int(0),
         "prevCard" : None,
@@ -769,7 +776,7 @@ async def funcETH(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         return await confirm_dlg_withdraw(update, str_Guide)
     if status == ST_ADS_PAY:
         str_Guide = f"How much do you wanna pay?\nCurrent Balance : {f_Balance} ETH\ne.g /0.01"
-        g_UserStatus[userId]['adsPayTokenType'] = ETH
+        g_UserStatus[userId]['advertise']['adsPayTokenType'] = ETH
         return await confirm_dlg_withdraw(update, str_Guide)
     else :
         str_Guide = f"How much do you wanna bet?\nCurrent Balance : {f_Balance} ETH\n"
@@ -799,7 +806,7 @@ async def funcBNB(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         return await confirm_dlg_withdraw(update, str_Guide)
     if status == ST_ADS_PAY:
         str_Guide = f"How much do you wanna pay?\nCurrent Balance : {f_Balance} BNB\ne.g /0.01"
-        g_UserStatus[userId]['adsPayTokenType'] = BNB
+        g_UserStatus[userId]['advertise']['adsPayTokenType'] = BNB
         return await confirm_dlg_withdraw(update, str_Guide)
     else :
         str_Guide = f"How much do you wanna bet?\nCurrent Balance : {f_Balance} BNB\n"
@@ -950,7 +957,7 @@ async def panelWithdrawAddress(update: Update, context: ContextTypes.DEFAULT_TYP
     if g_UserStatus[userId]['status'] == ST_WITHDRAW:
         tokenMode = g_UserStatus[userId]['withdrawTokenType']
     else:
-        tokenMode = g_UserStatus[userId]['adsPayTokenType']
+        tokenMode = g_UserStatus[userId]['advertise']['adsPayTokenType']
 
     if tokenMode == ETH:
         field = 'ETH_Amount'
@@ -1101,11 +1108,18 @@ async def adsBoard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     btnHome = [ InlineKeyboardButton("Home", callback_data="Cancel") ]
 
     id = 0
-    for adsBtn in g_AdsBtns:
-        callbackData = "adsTime:" + str(id)
-        boardButton = [ InlineKeyboardButton(adsBtn, callback_data=callbackData) ]
-        keyboard.append(boardButton)
-        id += 1
+    boardButton = []
+    for timeFormat in g_timeFormat:
+        for time in g_time:
+            callbackData = "adsTime:" + str(id)
+            buttonStr = time + timeFormat + " UTC"
+            button = InlineKeyboardButton(buttonStr, callback_data=callbackData)
+            boardButton.append(button)
+            if (id + 1) % 3 == 0:
+                keyboard.append(boardButton)
+                boardButton = []
+            id += 1
+    
     keyboard.append(btnHome)
 
     advertise = "👉📃 Book the ads at the following time"
@@ -1128,11 +1142,18 @@ async def _adsBoard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     btnHome = [ InlineKeyboardButton("Home", callback_data="Cancel") ]
 
     id = 0
-    for adsBtn in g_AdsBtns:
-        callbackData = "adsTime:" + str(id)
-        boardButton = [ InlineKeyboardButton(adsBtn, callback_data=callbackData) ]
-        keyboard.append(boardButton)
-        id += 1
+    boardButton = []
+    for timeFormat in g_timeFormat:
+        for time in g_time:
+            callbackData = "adsTime:" + str(id)
+            buttonStr = time + timeFormat + " UTC"
+            button = InlineKeyboardButton(buttonStr, callback_data=callbackData)
+            boardButton.append(button)
+            if (id + 1) % 3 == 0:
+                keyboard.append(boardButton)
+                boardButton = []
+            id += 1
+    
     keyboard.append(btnHome)
 
     advertise = "👉📃 Book the ads at the following time"
