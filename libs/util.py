@@ -2,6 +2,8 @@ import random
 import json
 import threading
 import sys
+import re
+import requests
 #******For Test********#
 # from db import (
 from libs.db import (
@@ -12,6 +14,8 @@ from libs.db import (
     insertInitialCoinInfos,
     insertFields
 )
+from urllib.request import urlopen
+from urllib.error import URLError
 import datetime
 from dotenv.main import load_dotenv
 import os
@@ -66,6 +70,39 @@ def truncDecimal(value: float, dec: int = 2) -> str:
 def truncDecimal7(value: float) -> str:
     trimStr = '{:.7f}'.format(value)
     return trimStr.rstrip('0').rstrip('.')
+
+def isValidUrl(url) -> bool:
+    res = True
+
+    httpsPattern = re.compile(r'^https?://\S+$')
+    isHttps = bool(httpsPattern.match(url))
+
+    httpPattern = re.compile(r'^http?://\S+$')
+    isHttp = bool(httpPattern.match(url))
+
+    res = isHttps or isHttp
+
+    return res
+
+def isOpenedUrl(url) -> bool:
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        return True
+    except requests.exceptions.HTTPError as e:
+        print("HTTP error occurred: ", e)
+        print("Status code:", response.status_code)
+        print("Reason:", response.reason)
+        return True
+    except requests.exceptions.ConnectionError as e:
+        print("Error connecting: ", e)
+        return False
+    except requests.exceptions.Timeout as e:
+        print("Timeout error: ", e)
+        return False
+    except requests.exceptions.RequestException as e:
+        print("An error occurred: ", e)
+        return False
 
 def roll() -> dict:
     slot = dict()

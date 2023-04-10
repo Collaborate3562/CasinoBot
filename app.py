@@ -74,6 +74,8 @@ from libs.util import (
     calculateFixedFee,
     truncDecimal,
     truncDecimal7,
+    isValidUrl,
+    isOpenedUrl,
 
     g_SlotCashOut,
     
@@ -137,7 +139,6 @@ g_time = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']
 g_duration = ['2', '4', '8', '12', '24']
 g_AdsBtns = ['6PM UTC','7PM UTC','8PM UTC','9PM UTC']
 g_AdsPayButton = ['2 HOURS ( X ETH/BNB )','4 HOURS ( X ETH/BNB )','8 HOURS ( X ETH/BNB )','12 HOURS ( X ETH/BNB )','24 HOURS ( X ETH/BNB )']
-g_AdsURL = ""
 g_AdsDesc = ""
 # Enable logging
 logging.basicConfig(
@@ -1173,9 +1174,9 @@ async def _adsConfirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     btnHome = [ InlineKeyboardButton("Home", callback_data="Cancel") ]
 
     id = 0
-    for payBtn in g_AdsPayButton:
+    for duration in g_duration:
         callbackData = "adsPay:" + str(id)
-        boardButton = [ InlineKeyboardButton(payBtn, callback_data=callbackData) ]
+        boardButton = [ InlineKeyboardButton(duration + ' HOURS ( X ETH/BNB )', callback_data=callbackData) ]
         keyboard.append(boardButton)
         id += 1
     keyboard.append(btnHome)
@@ -1188,13 +1189,30 @@ async def _adsConfirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
 
 async def adsDesc(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     print("==>ADS Step 3")
+    global g_UserStatus
     userId = update.message.from_user['id']
     text = update.message.text
 
-    #If desc ...
-    desc = text.split('/')[1]
-    global g_AdsDesc
-    g_AdsDesc = desc
+    backBtn = [ InlineKeyboardButton("Back", callback_data="Cancel") ]
+
+    if text[0] != '/':
+        await update.message.reply_text(
+            f"Incorrect form field.\ne.g /Lorem",
+            reply_markup=InlineKeyboardMarkup(backBtn)
+        )
+        return
+
+    #If content ...
+    content = text[1:]
+    if len(content) > 30:
+        await update.message.reply_text(
+            f"Limited to 30 characters maximum.\ne.g /Lorem",
+            reply_markup=InlineKeyboardMarkup(backBtn)
+        )
+        return
+    
+    g_UserStatus[userId]['advertise']['content'] = content
+
     keyboard = [
         [
             InlineKeyboardButton("Confirm", callback_data="adsConfirm"),
@@ -1202,36 +1220,72 @@ async def adsDesc(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         ]
     ]
     await update.message.reply_text(
-        f"Your ad will be showed on leaderboard, like this\n\n{g_AdsURL}\n{g_AdsDesc}\n\nPlease confirm your ad before payment",
+        f"Your ad will be showed on leaderboard, like this\n\n{g_UserStatus[userId]['advertise']['url']}\n{content}\n\nPlease confirm your ad before payment",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
     return ADSCONFIRM
     
 async def adsUrl(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     print("==>ADS Step 2")
+    global g_UserStatus
     userId = update.message.from_user['id']
     text = update.message.text
 
+    keyboard = [
+        [
+            InlineKeyboardButton("Back", callback_data="Cancel"),
+        ]
+    ]
+
+    if text[0] != '/':
+        await update.message.reply_text(
+            f"Incorrect form field.\ne.g /https://telegram.org",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+
     #If url ...
-    url = text.split('/')[1]
-    global g_AdsURL
-    g_AdsURL = url
+    url = text[1:]
+    print(url, type(url))
+
+    if not isValidUrl(url):
+        await update.message.reply_text(
+            f"URL is invalid.\nPlease check url again.",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+
+    print(isOpenedUrl(url))
+    if not isOpenedUrl(url):
+        await update.message.reply_text(
+            f"Can not open the url.\nPlease check url again.",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+
+    g_UserStatus[userId]['advertise']['url'] = url
+
     keyboard = [
         [
             InlineKeyboardButton("Back", callback_data="Cancel"),
         ]
     ]
     await update.message.reply_text(
-        f"Your ad URL is\n{g_AdsURL}\n👉📖Kindly submit your ad text\n    Limited to 30 characters maximum.\n   e.g /Lorem spreum..",
+        f"Your ad URL is\n{url}\n👉📖Kindly submit your ad text\n    Limited to 30 characters maximum.\n   e.g /Lorem spreum..",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
     return ADSDESC 
 
 async def _adsTime(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    global g_UserStatus
     print("==>ADS Step 1")
     query = update.callback_query
+    userId = query.from_user.id
     param = query.data.split(":")[1]
+
+    g_UserStatus[userId]['advertise']['time'] = int(param) + 1
+    print(g_UserStatus[userId]['advertise']['time'])
     print(f"_adsTime {param}")
     keyboard = []
     btnHome = [ InlineKeyboardButton("Home", callback_data="Cancel") ]
@@ -1239,7 +1293,7 @@ async def _adsTime(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     keyboard.append(btnHome)
 
     await query.message.edit_text(
-        f"👉🔗 Please submit the URL to be featured in the ad.\n    e.g /telegram.org",
+        f"👉🔗 Please submit the URL to be featured in the ad.\n    e.g /https://telegram.org",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
     return ADSURL
@@ -1252,6 +1306,7 @@ async def _adsPay(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     
     global g_UserStatus
     g_UserStatus[userId]['status'] = ST_ADS_PAY
+    g_UserStatus[userId]['duration'] = int(g_duration[int(param)])
     
     str_Guide = "Which token do you wanna pay?\n"
     return await _eth_bnb_dlg(update, str_Guide)
