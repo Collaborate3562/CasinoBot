@@ -418,6 +418,34 @@ async def calculateFixedFee(web3: any) -> float:
         return res
     return res
 
+async def getTokenPrice(tokenMode: int) -> float:
+    res = float(0)
+    try:
+        if tokenMode == 0:
+            price = await readFieldsWhereStr('tbl_cryptos', 'Price', 'Symbol=\'eth\'')
+            res = float(price[0][0])
+        else:
+            price = await readFieldsWhereStr('tbl_cryptos', 'Price', 'Symbol=\'bnb\'')
+            res = float(price[0][0])
+
+    except:
+        print("Get Token Price error")
+        return res
+    return res
+
+async def calculateCryptoAmountByUSD(amount: float, tokenMode: int) -> float:
+    res = float(0)
+    try:
+        tokenPrice = await getTokenPrice(tokenMode)
+        cryptoAmount = amount / tokenPrice
+        res = '{:.5f}'.format(cryptoAmount).rstrip('0').rstrip('.')
+        res = float(res)
+
+    except:
+        print("Calculate Crypto amount by USD amount error")
+        return res
+    return res
+
 def _getRandCard(CardHistory : str) -> dict:
     d = dict()
     random.seed(random.randint(1, 1000))

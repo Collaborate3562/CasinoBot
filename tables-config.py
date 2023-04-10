@@ -9,7 +9,7 @@ def table():
         db.commit()
         cur.execute("CREATE TABLE tbl_cryptos(id INT AUTO_INCREMENT Primary Key, Symbol VARCHAR(50), CoinId VARCHAR(50), Price FLOAT DEFAULT(0))")
         db.commit()
-        cur.execute("CREATE TABLE tbl_ads(id INT AUTO_INCREMENT Primary Key, UserID LONG, Url TEXT, Content TEXT, Time INT DEFAULT(0), Duration INT DEFAULT(0), Expired bool DEFAULT(FALSE), CreatedAt TIMESTAMP DEFAULT(CURRENT_TIMESTAMP), ExpiredAt TIMESTAMP DEFAULT(CURRENT_TIMESTAMP))")
+        cur.execute("CREATE TABLE tbl_ads(id INT AUTO_INCREMENT Primary Key, UserID LONG, Url TEXT, Content TEXT, Time INT DEFAULT(0), Duration INT DEFAULT(0), Expired bool DEFAULT(FALSE), StartTime TIMESTAMP DEFAULT(CURRENT_TIMESTAMP), CreatedAt TIMESTAMP DEFAULT(CURRENT_TIMESTAMP), ExpiredAt TIMESTAMP DEFAULT(CURRENT_TIMESTAMP))")
         db.commit()
         cur.execute("UPDATE tbl_cryptos SET Price=1700 WHERE id=1")
         db.commit()

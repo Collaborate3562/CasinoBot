@@ -71,6 +71,7 @@ from libs.util import (
     isFloat,
     isValidContractOrWallet,
     calculateTotalWithdrawFee,
+    calculateCryptoAmountByUSD,
     calculateFixedFee,
     truncDecimal,
     truncDecimal7,
@@ -137,6 +138,7 @@ g_BSC_Contract = None
 g_timeFormat = ['AM', 'PM']
 g_time = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']
 g_duration = ['2', '4', '8', '12', '24']
+g_price = [5, 10, 15, 20, 35]
 g_AdsBtns = ['6PM UTC','7PM UTC','8PM UTC','9PM UTC']
 g_AdsPayButton = ['2 HOURS ( X ETH/BNB )','4 HOURS ( X ETH/BNB )','8 HOURS ( X ETH/BNB )','12 HOURS ( X ETH/BNB )','24 HOURS ( X ETH/BNB )']
 g_AdsDesc = ""
@@ -265,7 +267,7 @@ async def wallet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         ]
     ]
     await update.message.reply_text(
-        f"@{userName}'s wallet\nAddress : {address}\nETH : {eth_amount}\nBNB : {bnb_amount}",
+        f"@{userName}'s wallet\nAddress: {address}\nETH : {eth_amount}\nBNB : {bnb_amount}",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
@@ -776,9 +778,12 @@ async def funcETH(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         g_UserStatus[userId]['withdrawTokenType'] = ETH
         return await confirm_dlg_withdraw(update, str_Guide)
     if status == ST_ADS_PAY:
-        str_Guide = f"How much do you wanna pay?\nCurrent Balance : {f_Balance} ETH\ne.g /0.01"
+        durationType = g_UserStatus[userId]['duration']
+        adsPayPrice = g_price[durationType]
+        adsPayAmount = await calculateCryptoAmountByUSD(float(adsPayPrice), ETH)
+        str_Guide = f"You must pay {adsPayAmount} ETH\nCurrent Balance : {f_Balance} ETH"
         g_UserStatus[userId]['advertise']['adsPayTokenType'] = ETH
-        return await confirm_dlg_withdraw(update, str_Guide)
+        return await confirm_dlg_pay_ads(update, str_Guide)
     else :
         str_Guide = f"How much do you wanna bet?\nCurrent Balance : {f_Balance} ETH\n"
         return await confirm_dlg_game(update, context, str_Guide, userId, g_Unit_ETH, f_Balance)
@@ -806,12 +811,28 @@ async def funcBNB(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         g_UserStatus[userId]['withdrawTokenType'] = BNB
         return await confirm_dlg_withdraw(update, str_Guide)
     if status == ST_ADS_PAY:
+        durationType = g_UserStatus[userId]['duration']
+        adsPayPrice = g_price[durationType]
+        adsPayAmount = await calculateCryptoAmountByUSD(float(adsPayPrice), BNB)
         str_Guide = f"How much do you wanna pay?\nCurrent Balance : {f_Balance} BNB\ne.g /0.01"
         g_UserStatus[userId]['advertise']['adsPayTokenType'] = BNB
         return await confirm_dlg_withdraw(update, str_Guide)
     else :
         str_Guide = f"How much do you wanna bet?\nCurrent Balance : {f_Balance} BNB\n"
         return await confirm_dlg_game(update, context, str_Guide, userId, g_Unit_BNB, f_Balance)
+
+async def confirm_dlg_pay_ads(update: Update, msg: str) -> int:
+    query = update.callback_query
+    keyboard = [
+        [
+            InlineKeyboardButton("Confirm", callback_data="ConfirmPayAds"),
+            InlineKeyboardButton("Cancel", callback_data="Cancel")
+        ]
+    ]
+    await query.message.edit_text(
+        msg,
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
 
 async def confirm_dlg_game(update: Update, context: ContextTypes.DEFAULT_TYPE, msg : str, userId: str, tokenAmount : float, balance : float) -> int:
     tokenMode = g_UserStatus[userId]['tokenMode']
