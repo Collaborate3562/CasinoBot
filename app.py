@@ -1461,8 +1461,8 @@ async def _board(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     ]
 
     adsField = "Url, Content"
-    # adsKind = "NOW() BETWEEN StartTime AND ExpiredAt"
-    adsKind = "NOW() BETWEEN CreatedAt AND StartTime"
+    adsKind = "NOW() BETWEEN StartTime AND ExpiredAt"
+    # adsKind = "NOW() BETWEEN CreatedAt AND StartTime"
 
     adsResult = await readFieldsWhereStr('tbl_ads', adsField, adsKind)
 
