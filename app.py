@@ -67,6 +67,7 @@ from libs.util import (
     getBalance,
     deploySmartContract,
     transferAssetsToContract,
+    createAds,
     withdrawAmount,
     isFloat,
     isValidContractOrWallet,
@@ -99,7 +100,7 @@ INFURA_ID = os.environ['INFURA_ID']
 BOT_TOKEN = os.environ['BOT_TOKEN']
 OWNER_ADDRESS = os.environ['OWNER_ADDRSS']
 
-MAIN, WALLET, SELECT, STATUS, PAYMENT, DEPOSIT, DISPLAY, COPY, LASTSELECT, AGAINSLOT, AGAINHILO, PANELHILO, PANELSLOT, BETTINGHILO, PANELDEPOSIT, PANELWITHDRAW, PANELWITHDRAWADDRESS, PANELADVERTISE, CANCEL, ADSTIME, ADSURL, ADSDESC, ADSCONFIRM, ADSPAY = range(24)
+MAIN, WALLET, SELECT, STATUS, PAYMENT, DEPOSIT, DISPLAY, COPY, LASTSELECT, AGAINSLOT, AGAINHILO, PANELHILO, PANELSLOT, BETTINGHILO, PANELDEPOSIT, PANELWITHDRAW, PANELWITHDRAWADDRESS, PANELADVERTISE, CANCEL, ADSTIME, ADSURL, ADSDESC, ADSCONFIRM, ADSPAY, ADSPAYCONFIRM = range(25)
 ST_DEPOSIT, ST_WITHDRAW, ST_HILO, ST_SLOT, ST_ADS_PAY = range(5)
 ETH, BNB = range(2)
 
@@ -778,11 +779,23 @@ async def funcETH(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         g_UserStatus[userId]['withdrawTokenType'] = ETH
         return await confirm_dlg_withdraw(update, str_Guide)
     if status == ST_ADS_PAY:
-        durationType = g_UserStatus[userId]['duration']
-        adsPayPrice = g_price[durationType]
+        duration = g_UserStatus[userId]['advertise']['duration']
+        adsPayPrice = g_price[g_duration.index(str(duration))]
         adsPayAmount = await calculateCryptoAmountByUSD(float(adsPayPrice), ETH)
+        if f_Balance < adsPayAmount:            
+            keyboard = [
+                [
+                    InlineKeyboardButton("Cancel", callback_data="Cancel"),
+                ]
+            ]
+            await query.message.edit_text(
+                "Insufficient Balance.\nYour current balance is {} ETH\nYou must pay {} ETH to create advertise".format(f_Balance, adsPayAmount),
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+            return CANCEL
         str_Guide = f"You must pay {adsPayAmount} ETH\nCurrent Balance : {f_Balance} ETH"
         g_UserStatus[userId]['advertise']['adsPayTokenType'] = ETH
+        g_UserStatus[userId]['advertise']['adsPayTokenAmount'] = adsPayAmount
         return await confirm_dlg_pay_ads(update, str_Guide)
     else :
         str_Guide = f"How much do you wanna bet?\nCurrent Balance : {f_Balance} ETH\n"
@@ -811,28 +824,27 @@ async def funcBNB(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         g_UserStatus[userId]['withdrawTokenType'] = BNB
         return await confirm_dlg_withdraw(update, str_Guide)
     if status == ST_ADS_PAY:
-        durationType = g_UserStatus[userId]['duration']
-        adsPayPrice = g_price[durationType]
+        duration = g_UserStatus[userId]['advertise']['duration']
+        adsPayPrice = g_price[g_duration.index(str(duration))]
         adsPayAmount = await calculateCryptoAmountByUSD(float(adsPayPrice), BNB)
-        str_Guide = f"How much do you wanna pay?\nCurrent Balance : {f_Balance} BNB\ne.g /0.01"
+        if f_Balance < adsPayAmount:            
+            keyboard = [
+                [
+                    InlineKeyboardButton("Cancel", callback_data="Cancel"),
+                ]
+            ]
+            await query.message.edit_text(
+                "Insufficient Balance.\nYour current balance is {} BNB\nYou must pay {} BNB to create advertise".format(f_Balance, adsPayAmount),
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+            return CANCEL
+        str_Guide = f"You must pay {adsPayAmount} BNB\nCurrent Balance : {f_Balance} BNB"
         g_UserStatus[userId]['advertise']['adsPayTokenType'] = BNB
-        return await confirm_dlg_withdraw(update, str_Guide)
+        g_UserStatus[userId]['advertise']['adsPayTokenAmount'] = adsPayAmount
+        return await confirm_dlg_pay_ads(update, str_Guide)
     else :
         str_Guide = f"How much do you wanna bet?\nCurrent Balance : {f_Balance} BNB\n"
         return await confirm_dlg_game(update, context, str_Guide, userId, g_Unit_BNB, f_Balance)
-
-async def confirm_dlg_pay_ads(update: Update, msg: str) -> int:
-    query = update.callback_query
-    keyboard = [
-        [
-            InlineKeyboardButton("Confirm", callback_data="ConfirmPayAds"),
-            InlineKeyboardButton("Cancel", callback_data="Cancel")
-        ]
-    ]
-    await query.message.edit_text(
-        msg,
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
 
 async def confirm_dlg_game(update: Update, context: ContextTypes.DEFAULT_TYPE, msg : str, userId: str, tokenAmount : float, balance : float) -> int:
     tokenMode = g_UserStatus[userId]['tokenMode']
@@ -1186,6 +1198,20 @@ async def _adsBoard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
     return ADSTIME
 
+async def confirm_dlg_pay_ads(update: Update, msg: str) -> int:
+    query = update.callback_query
+    keyboard = [
+        [
+            InlineKeyboardButton("Confirm", callback_data="ConfirmPayAds"),
+            InlineKeyboardButton("Cancel", callback_data="Cancel")
+        ]
+    ]
+    await query.message.edit_text(
+        msg,
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+    return ADSPAYCONFIRM
+
 async def _adsConfirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     print("==>ADS Step 4")
     query = update.callback_query
@@ -1308,16 +1334,51 @@ async def _adsTime(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     g_UserStatus[userId]['advertise']['time'] = int(param) + 1
     print(g_UserStatus[userId]['advertise']['time'])
     print(f"_adsTime {param}")
-    keyboard = []
-    btnHome = [ InlineKeyboardButton("Home", callback_data="Cancel") ]
-
-    keyboard.append(btnHome)
+    keyboard = [
+        [
+            InlineKeyboardButton("Home", callback_data="Cancel") 
+        ]
+    ]
 
     await query.message.edit_text(
         f"👉🔗 Please submit the URL to be featured in the ad.\n    e.g /https://telegram.org",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
     return ADSURL
+
+async def _adsPayConfirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    print("==>ADS Step 5")
+    global g_UserStatus
+    query = update.callback_query
+    userId = query.from_user.id
+
+    url = g_UserStatus[userId]['advertise']['url']
+    content = g_UserStatus[userId]['advertise']['content']
+    time = g_UserStatus[userId]['advertise']['time']
+    duration = g_UserStatus[userId]['advertise']['duration']
+    tokenMode = g_UserStatus[userId]['advertise']['adsPayTokenType']
+    amount = g_UserStatus[userId]['advertise']['adsPayTokenAmount']
+
+    await createAds(userId, url, content, time, duration, tokenMode, amount)
+
+    g_UserStatus[userId]["advertise"] =  {
+        "time": int(0),
+        "duration": int(0),
+        "url": "",
+        "content": "",
+        "adsPayTokenType": ETH,
+        "adsPayTokenAmount": float(0)
+    }
+    keyboard = [
+        [
+            InlineKeyboardButton("Home", callback_data="Cancel") 
+        ]
+    ]
+    await query.message.edit_text(
+        f"👉 You payment accepted",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+    return CANCEL
 
 async def _adsPay(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
@@ -1327,7 +1388,7 @@ async def _adsPay(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     
     global g_UserStatus
     g_UserStatus[userId]['status'] = ST_ADS_PAY
-    g_UserStatus[userId]['duration'] = int(g_duration[int(param)])
+    g_UserStatus[userId]['advertise']['duration'] = int(g_duration[int(param)])
     
     str_Guide = "Which token do you wanna pay?\n"
     return await _eth_bnb_dlg(update, str_Guide)
@@ -1375,7 +1436,7 @@ async def _board(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     topWinners = "🏆 Top 5 Winners 🎊"
 
     #get all adsContent from database
-    adsContent = "All ads will be showed here..."
+    adsContent = "All ads will be showed here...\n"
 
     ethPrice = await readFieldsWhereStr('tbl_cryptos', 'Price', 'Symbol=\'eth\'')
     ethPrice = ethPrice[0][0]
@@ -1398,6 +1459,17 @@ async def _board(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             InlineKeyboardButton("Home", callback_data="Cancel") 
         ]
     ]
+
+    adsField = "Url, Content"
+    # adsKind = "NOW() BETWEEN StartTime AND ExpiredAt"
+    adsKind = "NOW() BETWEEN CreatedAt AND StartTime"
+
+    adsResult = await readFieldsWhereStr('tbl_ads', adsField, adsKind)
+
+    for ad in adsResult:
+        adsContent += "\n👉 ------------------\n"
+        adsContent += ad[0] + "\n"
+        adsContent += ad[1] + "\n"
 
     query = update.callback_query
     # await context.bot.send_chat_action(query.message.chat_id, telegram.ChatAction.TYPING)
@@ -1533,6 +1605,8 @@ def main() -> None:
             ADSCONFIRM:     [CallbackQueryHandler(_adsConfirm, pattern="adsConfirm"),
                             CallbackQueryHandler(cancel, pattern="Cancel")],
             ADSPAY:         [CallbackQueryHandler(_adsPay, pattern="^adsPay:"),
+                            CallbackQueryHandler(cancel, pattern="Cancel")],
+            ADSPAYCONFIRM:  [CallbackQueryHandler(_adsPayConfirm, pattern="ConfirmPayAds"),
                             CallbackQueryHandler(cancel, pattern="Cancel")],
             PANELWITHDRAWADDRESS: [MessageHandler(filters.TEXT, panelWithdrawAddress),
                                    CallbackQueryHandler(cancel, pattern="Cancel")],

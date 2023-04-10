@@ -4,6 +4,8 @@ import threading
 import sys
 import re
 import requests
+import pytz
+from tzlocal import get_localzone
 #******For Test********#
 # from db import (
 from libs.db import (
@@ -443,6 +445,50 @@ async def calculateCryptoAmountByUSD(amount: float, tokenMode: int) -> float:
 
     except:
         print("Calculate Crypto amount by USD amount error")
+        return res
+    return res
+
+async def createAds(userId: str, link: str, content: str, time: int, duration: int, tokenMode: int, amount: float) -> bool:
+    res = False
+    try:
+        current_utc_time = datetime.datetime.now(pytz.utc)
+
+        booked_utc_time = current_utc_time.replace(hour=time, minute=0, second=0)
+
+        if booked_utc_time < current_utc_time:
+            booked_utc_time = booked_utc_time.replace(day=booked_utc_time.day + 1)
+
+        local_tz = get_localzone()
+
+        booked_local_time = booked_utc_time.astimezone(local_tz)
+        expired_local_time = booked_local_time.replace(hour=booked_local_time.hour + duration)
+
+        field = {
+            "UserID": userId,
+            "Url": link,
+            "Content": content,
+            "Time": time,
+            "Duration": duration,
+            "StartTime": booked_local_time,
+            "CreatedAt": datetime.datetime.now(),
+            "ExpiredAt": expired_local_time
+        }
+        
+        res = await insertFields('tbl_ads', field)
+
+        if tokenMode == 0:
+            field = "ETH_Amount"
+        else:
+            field = "BNB_Amount"
+
+        kind = "UserID=\"{}\"".format(userId)
+        prevAmount = await readFieldsWhereStr('tbl_users', field, kind)
+
+        curAmount = float(prevAmount[0][0]) - amount
+
+        res = await updateSetFloatWhereStr("tbl_users", field, curAmount, "UserID", userId)
+    except:
+        print("Create Ads error")
         return res
     return res
 
