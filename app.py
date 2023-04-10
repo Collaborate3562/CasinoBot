@@ -70,6 +70,8 @@ from libs.util import (
     withdrawAmount,
     isFloat,
     isValidContractOrWallet,
+    calculateTotalWithdrawFee,
+    calculateFixedFee,
     truncDecimal,
     truncDecimal7,
 
@@ -98,6 +100,12 @@ MAIN, WALLET, SELECT, STATUS, PAYMENT, DEPOSIT, DISPLAY, COPY, LASTSELECT, AGAIN
 ST_DEPOSIT, ST_WITHDRAW, ST_HILO, ST_SLOT, ST_ADS_PAY = range(5)
 ETH, BNB = range(2)
 
+HOUSE_CUT_FEE = 50
+PERCENTAGE = 1000
+
+ETH_FIXED_WITHDRAW_FEE = float(1)
+BSC_FIXED_WITHDRAW_FEE = float(0.3)
+
 g_SlotMark = "🎰 SLOTS 🎰\n\n"
 g_HiloMark = "♠️♥️ HILO ♦️♣️\n\n"
 g_UserStatus = {}
@@ -124,6 +132,9 @@ g_ETH_Web3 = None
 g_BSC_Web3 = None
 g_ETH_Contract = None
 g_BSC_Contract = None
+g_timeFormat = ['AM', 'PM']
+g_time = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']
+g_duration = ['2', '4', '8', '12', '24']
 g_AdsBtns = ['6PM UTC','7PM UTC','8PM UTC','9PM UTC']
 g_AdsPayButton = ['2 HOURS ( X ETH/BNB )','4 HOURS ( X ETH/BNB )','8 HOURS ( X ETH/BNB )','12 HOURS ( X ETH/BNB )','24 HOURS ( X ETH/BNB )']
 g_AdsURL = ""
@@ -932,7 +943,9 @@ async def panelWithdrawAddress(update: Update, context: ContextTypes.DEFAULT_TYP
     
     field = ''
     symbol= ''
+    web3 = None
     tokenMode = ETH
+    gasFee = float(0)
 
     if g_UserStatus[userId]['status'] == ST_WITHDRAW:
         tokenMode = g_UserStatus[userId]['withdrawTokenType']
@@ -942,14 +955,38 @@ async def panelWithdrawAddress(update: Update, context: ContextTypes.DEFAULT_TYP
     if tokenMode == ETH:
         field = 'ETH_Amount'
         symbol = 'ETH'
+        web3 = g_ETH_Web3
+        gasFee = ETH_FIXED_WITHDRAW_FEE
     else:
         field = 'BNB_Amount'
         symbol = 'BNB'
+        web3 = g_BSC_Web3
+        gasFee = BSC_FIXED_WITHDRAW_FEE
+
+    keyboard = [
+        [
+            InlineKeyboardButton("Cancel", callback_data="Cancel"),
+        ]
+    ]
+
+    fee = float(0)
+    fixedFee = float(0)
+    if g_UserStatus[userId]['status'] == ST_WITHDRAW:
+        fee = await calculateTotalWithdrawFee(web3, float(amount))
+        fixedFee = await calculateFixedFee(web3)
+        if fee > float(amount):
+            await update.message.reply_text(
+                "Withdraw amount must be bigger than fee.\nFee is House cut(5%) and gas(${}).\nCurrent House cut is {} {}.$1 is {} {}\n".format(gasFee, float(amount) * HOUSE_CUT_FEE / PERCENTAGE, symbol, fixedFee, symbol),
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+            return
+
     balance = await readFieldsWhereStr('tbl_users', field, kind)
 
     if float(amount) > float(balance[0][0]):
         await update.message.reply_text(
-            "Insufficient Balance.\nYour current balance is {} {}\n/start".format(balance[0][0], symbol)
+            "Insufficient Balance.\nYour current balance is {} {}\n/start".format(balance[0][0], symbol),
+            reply_markup=InlineKeyboardMarkup(keyboard)
         )
         return
 
@@ -958,15 +995,9 @@ async def panelWithdrawAddress(update: Update, context: ContextTypes.DEFAULT_TYP
     else:
         g_UserStatus[userId]['adsPayAmount'] = float(amount)
     
-    keyboard = [
-        [
-            InlineKeyboardButton("Cancel", callback_data="Cancel"),
-        ]
-    ]
-
     if g_UserStatus[userId]['status'] == ST_WITHDRAW:
         await update.message.reply_text(
-            "Please enter your wallet address to withdraw\ne.g /0x43cbE0ce689dbC237A517EFAAe7B8c290C4e64df",
+            "Fee is {} {}.\nHouse Cut({} {}) and ${}({} {})\nYou will receive {} {}\nPlease enter your wallet address to withdraw\ne.g /0x43cbE0ce689dbC237A517EFAAe7B8c290C4e64df".format(fee, symbol, float(amount) * HOUSE_CUT_FEE / PERCENTAGE, symbol, str(gasFee).rstrip('0').rstrip('.'), fixedFee, symbol, '{:.5f}'.format(float(amount) - fee).rstrip('0'), symbol),
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
         return PANELWITHDRAW
