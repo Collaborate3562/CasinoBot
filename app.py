@@ -17,6 +17,8 @@ import logging
 import pyperclip
 import threading
 import time
+
+import pytz
 # import telegram
 from web3 import Web3, IPCProvider
 from telegram import __version__ as TG_VER
@@ -143,9 +145,11 @@ g_timeFormat = ['AM', 'PM']
 g_time = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']
 g_duration = ['2', '4', '8', '12', '24']
 g_price = [5, 10, 15, 20, 35]
+g_adsETHPrice = [0.075, 0.13, 0.2, 0.3, 0.5]
+g_adsBNBPrice = [0.45, 0.78, 1.2, 1.8, 3]
 g_AdsBtns = ['6PM UTC', '7PM UTC', '8PM UTC', '9PM UTC']
-g_AdsPayButton = ['2 HOURS ( X ETH/BNB )', '4 HOURS ( X ETH/BNB )',
-                  '8 HOURS ( X ETH/BNB )', '12 HOURS ( X ETH/BNB )', '24 HOURS ( X ETH/BNB )']
+g_AdsPayButton = ['2 Hours - 0.075 ETH / 0.45 BNB', '4 Hours - 0.13 ETH / 0.78 BNB',
+                  '8 Hours - 0.2 ETH / 1.2 BNB', '12 Hours - 0.3 ETH / 1.8 BNB', '24 Hours - 0.5 ETH / 3 BNB']
 g_AdsDesc = ""
 # Enable logging
 logging.basicConfig(
@@ -826,9 +830,8 @@ async def funcETH(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         g_UserStatus[userId]['withdrawTokenType'] = ETH
         return await confirm_dlg_withdraw(update, str_Guide)
     if status == ST_ADS_PAY:
-        duration = g_UserStatus[userId]['advertise']['duration']
-        adsPayPrice = g_price[g_duration.index(str(duration))]
-        adsPayAmount = await calculateCryptoAmountByUSD(float(adsPayPrice), ETH)
+        durationIndex = g_UserStatus[userId]['advertise']['duration']
+        adsPayAmount = g_adsETHPrice[durationIndex]
         if f_Balance < adsPayAmount:
             keyboard = [
                 [
@@ -873,9 +876,8 @@ async def funcBNB(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         g_UserStatus[userId]['withdrawTokenType'] = BNB
         return await confirm_dlg_withdraw(update, str_Guide)
     if status == ST_ADS_PAY:
-        duration = g_UserStatus[userId]['advertise']['duration']
-        adsPayPrice = g_price[g_duration.index(str(duration))]
-        adsPayAmount = await calculateCryptoAmountByUSD(float(adsPayPrice), BNB)
+        durationIndex = g_UserStatus[userId]['advertise']['duration']
+        adsPayAmount = g_adsBNBPrice[durationIndex]
         if f_Balance < adsPayAmount:
             keyboard = [
                 [
@@ -1197,12 +1199,16 @@ async def _help(update: Update, context: CallbackContext) -> None:
 #                             +advertise                               #
 ########################################################################
 
-
 async def adsBoard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     userInfo = update.message.from_user
     userId = userInfo['id']
     userName = userInfo['username']
 
+    current_utc_time = datetime.datetime.now(pytz.utc)
+    formatted_time = current_utc_time.strftime("%Y-%m-%d %H:%M:%S")
+
+    current_hour = current_utc_time.hour
+    print(current_hour, type(current_hour))
     print('{} is watching ADS board, his user ID: {} '.format(userName, userId))
     # kind = "UserID=\"{}\"".format(userId)
 
@@ -1211,21 +1217,30 @@ async def adsBoard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
     id = 0
     boardButton = []
-    for timeFormat in g_timeFormat:
-        for time in g_time:
-            callbackData = "adsTime:" + str(id)
-            buttonStr = time + timeFormat + " UTC"
-            button = InlineKeyboardButton(
-                buttonStr, callback_data=callbackData)
-            boardButton.append(button)
-            if (id + 1) % 3 == 0:
-                keyboard.append(boardButton)
-                boardButton = []
-            id += 1
+    for i in range(current_hour + 1, current_hour + 14):
+        if i > 24:
+            i = i - 24
+        callbackData = "adsTime:" + str(i)
+        timeFormat = ""
+        clock = ""
+        if i > 12:
+            timeFormat = "PM"
+            clock = str(i - 12)
+        else:
+            timeFormat = "AM"
+            clock = str(i)
+        buttonStr = clock + timeFormat + " UTC"
+        button = InlineKeyboardButton(
+            buttonStr, callback_data=callbackData)
+        boardButton.append(button)
+        if (id + 1) % 2 == 0:
+            keyboard.append(boardButton)
+            boardButton = []
+        id += 1
 
     keyboard.append(btnHome)
 
-    advertise = "👉📃 Book the ads at the following time"
+    advertise = f"👉📃 Book the ads at the following time.\nCurrent UTC time is {formatted_time}"
     await update.message.reply_text(
         f"{advertise}",
         reply_markup=InlineKeyboardMarkup(keyboard)
@@ -1239,7 +1254,11 @@ async def _adsBoard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     userId = query.from_user.id
 
+    current_utc_time = datetime.datetime.now(pytz.utc)
+    formatted_time = current_utc_time.strftime("%Y-%m-%d %H:%M:%S")
+
     print('{} is watching ADS board'.format(userId))
+    current_hour = current_utc_time.hour
 
     # kind = "UserID=\"{}\"".format(userId)
     keyboard = []
@@ -1247,21 +1266,30 @@ async def _adsBoard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
     id = 0
     boardButton = []
-    for timeFormat in g_timeFormat:
-        for time in g_time:
-            callbackData = "adsTime:" + str(id)
-            buttonStr = time + timeFormat + " UTC"
-            button = InlineKeyboardButton(
-                buttonStr, callback_data=callbackData)
-            boardButton.append(button)
-            if (id + 1) % 3 == 0:
-                keyboard.append(boardButton)
-                boardButton = []
-            id += 1
+    for i in range(current_hour + 1, current_hour + 14):
+        if i > 24:
+            i = i - 24
+        callbackData = "adsTime:" + str(i)
+        timeFormat = ""
+        clock = ""
+        if i > 12:
+            timeFormat = "PM"
+            clock = str(i - 12)
+        else:
+            timeFormat = "AM"
+            clock = str(i)
+        buttonStr = clock + timeFormat + " UTC"
+        button = InlineKeyboardButton(
+            buttonStr, callback_data=callbackData)
+        boardButton.append(button)
+        if (id + 1) % 2 == 0:
+            keyboard.append(boardButton)
+            boardButton = []
+        id += 1
 
     keyboard.append(btnHome)
 
-    advertise = "👉📃 Book the ads at the following time"
+    advertise = f"👉📃 Book the ads at the following time.\nCurrent UTC time is {formatted_time}"
     await query.message.edit_text(
         f"{advertise}",
         reply_markup=InlineKeyboardMarkup(keyboard)
@@ -1294,10 +1322,11 @@ async def _adsConfirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     btnHome = [InlineKeyboardButton("Home", callback_data="Cancel")]
 
     id = 0
-    for duration in g_duration:
+    for payButton in g_AdsPayButton:
         callbackData = "adsPay:" + str(id)
-        boardButton = [InlineKeyboardButton(
-            duration + ' HOURS ( X ETH/BNB )', callback_data=callbackData)]
+        boardButton = [
+            InlineKeyboardButton(payButton, callback_data=callbackData)
+        ]
         keyboard.append(boardButton)
         id += 1
     keyboard.append(btnHome)
@@ -1364,7 +1393,7 @@ async def adsUrl(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
     if text[0] != '/':
         await update.message.reply_text(
-            f"Incorrect form field.\ne.g /https://telegram.org",
+            f"Incorrect form field.\ne.g /https://t.me/AleekkCalls",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
         return
@@ -1419,7 +1448,7 @@ async def _adsTime(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     ]
 
     await query.message.edit_text(
-        f"👉🔗 Please submit the URL to be featured in the ad.\n    e.g /https://telegram.org",
+        f"👉🔗 Please submit the URL to be featured in the ad.\n    e.g /https://t.me/AleekkCalls",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
     return ADSURL
@@ -1468,7 +1497,7 @@ async def _adsPay(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
     global g_UserStatus
     g_UserStatus[userId]['status'] = ST_ADS_PAY
-    g_UserStatus[userId]['advertise']['duration'] = int(g_duration[int(param)])
+    g_UserStatus[userId]['advertise']['duration'] = int(param)
 
     str_Guide = "Which token do you wanna pay?\n"
     return await _eth_bnb_dlg(update, str_Guide)
