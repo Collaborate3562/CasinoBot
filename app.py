@@ -1199,6 +1199,7 @@ async def _help(update: Update, context: CallbackContext) -> None:
 #                             +advertise                               #
 ########################################################################
 
+
 async def adsBoard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     userInfo = update.message.from_user
     userId = userInfo['id']
@@ -1463,7 +1464,8 @@ async def _adsPayConfirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     url = g_UserStatus[userId]['advertise']['url']
     content = g_UserStatus[userId]['advertise']['content']
     time = g_UserStatus[userId]['advertise']['time']
-    duration = g_UserStatus[userId]['advertise']['duration']
+    durationIndex = g_UserStatus[userId]['advertise']['duration']
+    duration = int(g_duration[durationIndex])
     tokenMode = g_UserStatus[userId]['advertise']['adsPayTokenType']
     amount = g_UserStatus[userId]['advertise']['adsPayTokenAmount']
 
@@ -1539,6 +1541,21 @@ async def board(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         ]
     ]
 
+    current_time = datetime.datetime.now()
+    current_time = current_time.replace(hour=current_time.hour + 1)
+    formatted_time = current_time.strftime("%Y-%m-%d %H:%M:%S")
+    adsField = "Url, Content"
+    adsKind = f"'{formatted_time}' BETWEEN StartTime AND ExpiredAt"
+    # adsKind = "NOW() BETWEEN CreatedAt AND StartTime"
+
+    adsResult = await readFieldsWhereStr('tbl_ads', adsField, adsKind)
+
+    for ad in adsResult:
+        adsContent += "\n👉 ------------------\n"
+        adsContent += ad[0] + "\n"
+        adsContent += ad[1] + "\n\n"
+
+    # await context.bot.send_chat_action(query.message.chat_id, telegram.ChatAction.TYPING)
     await update.message.reply_text(
         f"---📜 Leaderboards 🧮---\n\n{topWinners}\n\n{topWagers}\n\n\n{adsContent}",
         reply_markup=InlineKeyboardMarkup(keyboard)
@@ -1578,9 +1595,11 @@ async def _board(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         ]
     ]
 
+    current_time = datetime.datetime.now()
+    current_time = current_time.replace(hour=current_time.hour + 1)
+    formatted_time = current_time.strftime("%Y-%m-%d %H:%M:%S")
     adsField = "Url, Content"
-    adsKind = "NOW() BETWEEN StartTime AND ExpiredAt"
-    # adsKind = "NOW() BETWEEN CreatedAt AND StartTime"
+    adsKind = f"'{formatted_time}' BETWEEN StartTime AND ExpiredAt"
 
     adsResult = await readFieldsWhereStr('tbl_ads', adsField, adsKind)
 

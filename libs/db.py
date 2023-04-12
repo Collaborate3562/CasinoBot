@@ -1,10 +1,12 @@
 import mysql.connector
 import datetime
 
-db = mysql.connector.connect(user='root', password='',host='localhost',database = 'DB_AleekkCasino', auth_plugin='mysql_native_password')
+db = mysql.connector.connect(user='root', password='', host='localhost',
+                             database='DB_AleekkCasino', auth_plugin='mysql_native_password')
 cur = db.cursor()
 
-async def updateSetStrWhereStr(table : str, field : str, value : str, where : str, wherestr : str) -> bool:
+
+async def updateSetStrWhereStr(table: str, field: str, value: str, where: str, wherestr: str) -> bool:
     bRes = False
     try:
         query = f"UPDATE {table} SET {field}='{value}' WHERE {where}='{wherestr}';"
@@ -17,7 +19,8 @@ async def updateSetStrWhereStr(table : str, field : str, value : str, where : st
         print("update error")
     return bRes
 
-async def updateSetFloatWhereStr(table : str, field : str, value : float, where : str, wherestr : str) -> bool:
+
+async def updateSetFloatWhereStr(table: str, field: str, value: float, where: str, wherestr: str) -> bool:
     bRes = False
     try:
         query = f"UPDATE {table} SET {field}={value} WHERE {where}='{wherestr}';"
@@ -30,6 +33,7 @@ async def updateSetFloatWhereStr(table : str, field : str, value : float, where 
         print("update error")
     return bRes
 
+
 async def getTopFieldsByLimit(table: str, field: str, orderColumn: str, limit: str) -> bool:
     res = []
     try:
@@ -41,7 +45,8 @@ async def getTopFieldsByLimit(table: str, field: str, orderColumn: str, limit: s
         print("Get Top Values error")
     return res
 
-async def readFieldsWhereStr(table : str, field : str, kind : str) -> any:
+
+async def readFieldsWhereStr(table: str, field: str, kind: str) -> any:
     res = []
     try:
         query = f"SELECT {field} FROM {table} WHERE {kind};"
@@ -51,13 +56,15 @@ async def readFieldsWhereStr(table : str, field : str, kind : str) -> any:
         print("Read Field error")
     return res
 
-async def insertFields(table : str, field : dict) -> bool:
+
+async def insertFields(table: str, field: dict) -> bool:
     bRes = False
     try:
         placeholders = ', '.join(['%s'] * len(field))
         columns = ', '.join(field.keys())
 
-        query = "INSERT INTO %s ( %s ) VALUES ( %s )" % (table, columns, placeholders)
+        query = "INSERT INTO %s ( %s ) VALUES ( %s )" % (
+            table, columns, placeholders)
         print(query)
 
         cur.execute(query, list(field.values()))
@@ -68,6 +75,7 @@ async def insertFields(table : str, field : dict) -> bool:
     except:
         print("Insert error")
     return bRes
+
 
 async def insertInitialCoinInfos() -> bool:
     bRes = False
