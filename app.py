@@ -104,7 +104,7 @@ OWNER_ADDRESS = os.environ['OWNER_ADDRSS']
 
 MAIN, WALLET, SELECT, STATUS, PAYMENT, DEPOSIT, DISPLAY, COPY, LASTSELECT, AGAINSLOT, AGAINHILO, PANELHILO, PANELSLOT, BETTINGHILO, PANELDEPOSIT, PANELWITHDRAW, PANELWITHDRAWADDRESS, PANELADVERTISE, CANCEL, ADSTIME, ADSURL, ADSDESC, ADSCONFIRM, ADSPAY, ADSPAYCONFIRM = range(
     25)
-ST_DEPOSIT, ST_WITHDRAW, ST_HILO, ST_SLOT, ST_ADS_PAY = range(5)
+ST_DEPOSIT, ST_WITHDRAW, ST_HILO, ST_COINFLIP, ST_SLOT, ST_ADS_PAY = range(6)
 ETH, BNB = range(2)
 
 HOUSE_CUT_FEE = 50
@@ -115,6 +115,7 @@ BSC_FIXED_WITHDRAW_FEE = float(0.3)
 
 g_SlotMark = "🎰 SLOTS 🎰\n\n"
 g_HiloMark = "♠️♥️ HILO ♦️♣️\n\n"
+g_CoinFlipMark = "🟡 COIN FLIP ⚪\n\n"
 g_UserStatus = {}
 # Test Token
 TOKEN = BOT_TOKEN
@@ -246,6 +247,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         ],
         [
             InlineKeyboardButton("Play Hilo", callback_data="Play Hilo"),
+            InlineKeyboardButton("Play CoinFlip", callback_data="Play CoinFlip"),
             InlineKeyboardButton("Play Slot", callback_data="Play Slot"),
         ],
         [
@@ -349,8 +351,17 @@ async def _playHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     str_Guide = f"{g_HiloMark}Which token do you wanna bet?\n"
     return await _eth_bnb_dlg(update, str_Guide)
 
+async def _playCoinFlip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    userId = query.from_user.id
+    init(userId)
+    global g_UserStatus
+    g_UserStatus[userId]['status'] = ST_COINFLIP
+    str_Guide = f"{g_CoinFlipMark}Which token do you wanna bet?\n"
+    return await _eth_bnb_dlg(update, str_Guide)
 
-async def _panelHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+
+async def _panelHiloOrCoinFlip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     global g_UserStatus
     keyboard = []
@@ -464,7 +475,7 @@ async def _high(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         print("High=>TRUE")
         g_UserStatus[userId]['cashOutHiloCnt'] += 1
         g_UserStatus[userId]['nextCard'] = card
-        return await _panelHilo(update, context)
+        return await _panelHiloOrCoinFlip(update, context)
     else:
         print("High=>FALSE")
         sCardHistory = g_UserStatus[userId]['cardHistory']
@@ -517,7 +528,7 @@ async def _low(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         print("LOW=>TRUE")
         g_UserStatus[userId]['nextCard'] = card
         g_UserStatus[userId]['cashOutHiloCnt'] += 1
-        return await _panelHilo(update, context)
+        return await _panelHiloOrCoinFlip(update, context)
     else:
         print("LOW=>FALSE")
         g_UserStatus[userId]['cashOutHiloCnt'] = 0
@@ -910,14 +921,21 @@ async def confirm_dlg_game(update: Update, context: ContextTypes.DEFAULT_TYPE, m
 
     sPlayButton = ""
     sMark = ""
+    sCallBackData = ""
     status = g_UserStatus[userId]['status']
     print(status)
     match status:
         case 2:  # ST_HILO
             sPlayButton = "Play"
+            sCallBackData = "Play:2"
             sMark = g_HiloMark
-        case 3:  # ST_SLOT
+        case 3:  # ST_COINFLIP
+            sPlayButton = "Play"
+            sCallBackData = "Play:3"
+            sMark = g_CoinFlipMark
+        case 4:  # ST_SLOT
             sPlayButton = "Roll"
+            sCallBackData = "Roll"
             sMark = g_SlotMark
 
     keyboard = [
@@ -927,7 +945,7 @@ async def confirm_dlg_game(update: Update, context: ContextTypes.DEFAULT_TYPE, m
             InlineKeyboardButton("x2", callback_data="changeBetAmount:1"),
         ],
         [
-            InlineKeyboardButton(sPlayButton, callback_data=sPlayButton),
+            InlineKeyboardButton(sPlayButton, callback_data=sCallBackData),
         ]
     ]
     if tokenAmount > balance:
@@ -1727,6 +1745,8 @@ def main() -> None:
                                  _playHilo, pattern="Play Hilo"),
                              CallbackQueryHandler(
                                  _playSlot, pattern="Play Slot"),
+                             CallbackQueryHandler(
+                                 _playCoinFlip, pattern="Play CoinFlip"),
                              CallbackQueryHandler(_board, pattern="Board"),
                              CallbackQueryHandler(
                                  _adsBoard, pattern="advertise"),
@@ -1738,7 +1758,7 @@ def main() -> None:
                              CallbackQueryHandler(cancel, pattern="Cancel")],
             LASTSELECT:    [CallbackQueryHandler(_changeBetAmount, pattern="^changeBetAmount:"),
                             CallbackQueryHandler(cancel, pattern="Cancel"),
-                            CallbackQueryHandler(_panelHilo, pattern="Play"),
+                            CallbackQueryHandler(_panelHiloOrCoinFlip, pattern="^Play:"),
                             CallbackQueryHandler(_panelSlot, pattern="Roll")],
             AGAINSLOT:      [CallbackQueryHandler(cancel, pattern="Cancel"),
                              CallbackQueryHandler(
@@ -1746,7 +1766,7 @@ def main() -> None:
                              CallbackQueryHandler(_playSlot, pattern="changeBet"),],
             AGAINHILO:      [CallbackQueryHandler(cancel, pattern="Cancel"),
                              CallbackQueryHandler(
-                                 _panelHilo, pattern="againHilo"),
+                                 _panelHiloOrCoinFlip, pattern="againHilo"),
                              CallbackQueryHandler(_playHilo, pattern="changeBet")],
             PANELDEPOSIT:   [MessageHandler(filters.TEXT, panelDeposit)],
             CANCEL:         [CallbackQueryHandler(cancel, pattern="Cancel")],
