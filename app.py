@@ -102,8 +102,8 @@ INFURA_ID = os.environ['INFURA_ID']
 BOT_TOKEN = os.environ['BOT_TOKEN']
 OWNER_ADDRESS = os.environ['OWNER_ADDRSS']
 
-MAIN, WALLET, SELECT, STATUS, PAYMENT, DEPOSIT, DISPLAY, COPY, LASTSELECT, AGAINSLOT, AGAINHILO, PANELHILO, PANELSLOT, BETTINGHILO, PANELDEPOSIT, PANELWITHDRAW, PANELWITHDRAWADDRESS, PANELADVERTISE, CANCEL, ADSTIME, ADSURL, ADSDESC, ADSCONFIRM, ADSPAY, ADSPAYCONFIRM = range(
-    25)
+MAIN, WALLET, SELECT, STATUS, PAYMENT, DEPOSIT, DISPLAY, COPY, LASTSELECT, AGAINSLOT, AGAINHILO, PANELHILO, PANELSLOT, BETTINGHILO, BETTINGCOINFLIP, PANELDEPOSIT, PANELWITHDRAW, PANELWITHDRAWADDRESS, PANELADVERTISE, CANCEL, ADSTIME, ADSURL, ADSDESC, ADSCONFIRM, ADSPAY, ADSPAYCONFIRM = range(
+    26)
 ST_DEPOSIT, ST_WITHDRAW, ST_HILO, ST_COINFLIP, ST_SLOT, ST_ADS_PAY = range(6)
 ETH, BNB = range(2)
 
@@ -369,92 +369,112 @@ async def _panelHiloOrCoinFlip(update: Update, context: ContextTypes.DEFAULT_TYP
     sGreeting = ""
 
     userId = query.from_user.id
-    if g_UserStatus[userId]['cashOutHiloCnt'] == 0:
-        kind = "UserID=\"{}\"".format(userId)
-        wallet = await readFieldsWhereStr("tbl_users", "Wallet", kind)
-        address = wallet[0][0]
-        web3 = None
-        field = "ETH_Amount"
-        wagerField = "ETH_Wagered"
-        tokenMode = g_UserStatus[userId]['tokenMode']
+    
+    param = query.data.split(":")[1]
+    print('param', param)
+    
+    if int(param) == 2: # ST_HILO
+        if g_UserStatus[userId]['cashOutHiloCnt'] == 0:
+            kind = "UserID=\"{}\"".format(userId)
+            wallet = await readFieldsWhereStr("tbl_users", "Wallet", kind)
+            address = wallet[0][0]
+            web3 = None
+            field = "ETH_Amount"
+            wagerField = "ETH_Wagered"
+            tokenMode = g_UserStatus[userId]['tokenMode']
 
-        if tokenMode == ETH:
-            web3 = g_ETH_Web3
-        else:
-            web3 = g_BSC_Web3
-            field = "BNB_Amount"
-            wagerField = "BNB_Wagered"
+            if tokenMode == ETH:
+                web3 = g_ETH_Web3
+            else:
+                web3 = g_BSC_Web3
+                field = "BNB_Amount"
+                wagerField = "BNB_Wagered"
 
-        f_Balance = await getBalance(address, web3, userId)
-        if float(f_Balance) <= 0:
+            f_Balance = await getBalance(address, web3, userId)
+            if float(f_Balance) <= 0:
+                keyboard = [
+                    [
+                        InlineKeyboardButton("Deposit", callback_data="Deposit"),
+                        InlineKeyboardButton("Back", callback_data="Cancel"),
+                    ]
+                ]
+                await query.message.edit_text(
+                    "Insufficient funds!\nPlease deposit more funds",
+                    reply_markup=InlineKeyboardMarkup(keyboard)
+                )
+
+                return CANCEL & MAIN
+
+            tokenAmount = g_UserStatus[userId]['curTokenAmount']
+            if float(f_Balance) <= tokenAmount:
+                tokenAmount = float(f_Balance)
+                g_UserStatus[userId]['curTokenAmount'] = float(f_Balance)
+
+            print(f_Balance)
+            print(tokenAmount)
+            await updateSetFloatWhereStr("tbl_users", field, f_Balance - tokenAmount, "UserID", userId)
+
+            previousWagered = await readFieldsWhereStr("tbl_users", wagerField, kind)
+            oldWagerAmount = float(previousWagered[0][0])
+            await updateSetFloatWhereStr("tbl_users", wagerField, oldWagerAmount + tokenAmount, "UserID", userId)
+
+        cardHistory = g_UserStatus[userId]['cardHistory']
+        prevCard = g_UserStatus[userId]['prevCard']
+        nextCard = g_UserStatus[userId]['nextCard']
+
+        cashOutId = g_UserStatus[userId]['cashOutHiloCnt']
+        if cashOutId > 0:
+            sGreeting = f"You Won!🎉\nPrevious Cards:{cardHistory}\n"
+            print(nextCard)
+            newCard = nextCard
+            g_UserStatus[userId]['prevCard'] = newCard
+            print(newCard)
+            print(prevCard)
             keyboard = [
                 [
-                    InlineKeyboardButton("Deposit", callback_data="Deposit"),
-                    InlineKeyboardButton("Back", callback_data="Cancel"),
+                    InlineKeyboardButton("High", callback_data="High"),
+                    InlineKeyboardButton("Low", callback_data="Low"),
+                ],
+                [
+                    InlineKeyboardButton("Cashout", callback_data="cashOutHilo"),
                 ]
             ]
             await query.message.edit_text(
-                "Insufficient funds!\nPlease deposit more funds",
+                f"{sGreeting}Current Card: {str(newCard['label'])}\n\nCashout : x{g_HiloCashOut[cashOutId]}\nCashout:" + "{:.4f}".format(
+                    g_UserStatus[userId]['curTokenAmount'] * g_HiloCashOut[cashOutId]) + getUnitString(g_UserStatus[userId]['tokenMode']) + "\nWhat is your next guess? High or Low?",
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
-
-            return CANCEL & MAIN
-
-        tokenAmount = g_UserStatus[userId]['curTokenAmount']
-        if float(f_Balance) <= tokenAmount:
-            tokenAmount = float(f_Balance)
-            g_UserStatus[userId]['curTokenAmount'] = float(f_Balance)
-
-        print(f_Balance)
-        print(tokenAmount)
-        await updateSetFloatWhereStr("tbl_users", field, f_Balance - tokenAmount, "UserID", userId)
-
-        previousWagered = await readFieldsWhereStr("tbl_users", wagerField, kind)
-        oldWagerAmount = float(previousWagered[0][0])
-        await updateSetFloatWhereStr("tbl_users", wagerField, oldWagerAmount + tokenAmount, "UserID", userId)
-
-    cardHistory = g_UserStatus[userId]['cardHistory']
-    prevCard = g_UserStatus[userId]['prevCard']
-    nextCard = g_UserStatus[userId]['nextCard']
-
-    cashOutId = g_UserStatus[userId]['cashOutHiloCnt']
-    if cashOutId > 0:
-        sGreeting = f"You Won!🎉\nPrevious Cards:{cardHistory}\n"
-        print(nextCard)
-        newCard = nextCard
-        g_UserStatus[userId]['prevCard'] = newCard
-        print(newCard)
-        print(prevCard)
+            return BETTINGHILO
+        else:
+            sGreeting = "High - Low Game started!\n\n"
+            newCard = controlRandCard(True, cardHistory, prevCard)
+            g_UserStatus[userId]['prevCard'] = newCard
+            keyboard = [
+                [
+                    InlineKeyboardButton("High", callback_data="High"),
+                    InlineKeyboardButton("Low", callback_data="Low"),
+                ]
+            ]
+            await query.message.edit_text(
+                f"{sGreeting}Current Card: {str(newCard['label'])}\nWhat is your next guess? High or Low?",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+            return BETTINGHILO
+    elif int(param) == 3: # ST_COINFLIP
+        sGreeting = "CoinFlip Game started!\n\n"
         keyboard = [
             [
-                InlineKeyboardButton("High", callback_data="High"),
-                InlineKeyboardButton("Low", callback_data="Low"),
-            ],
-            [
-                InlineKeyboardButton("Cashout", callback_data="cashOutHilo"),
+                InlineKeyboardButton("Heads", callback_data="Heads"),
+                InlineKeyboardButton("Tails", callback_data="Tails"),
             ]
         ]
         await query.message.edit_text(
-            f"{sGreeting}Current Card: {str(newCard['label'])}\n\nCashout : x{g_HiloCashOut[cashOutId]}\nCashout:" + "{:.4f}".format(
-                g_UserStatus[userId]['curTokenAmount'] * g_HiloCashOut[cashOutId]) + getUnitString(g_UserStatus[userId]['tokenMode']) + "\nWhat is your next guess? High or Low?",
+            f"{sGreeting}\nWhat is your next guess? Heads or Tails?",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
-        return BETTINGHILO
+        return BETTINGCOINFLIP
     else:
-        sGreeting = "High - Low Game started!\n\n"
-        newCard = controlRandCard(True, cardHistory, prevCard)
-        g_UserStatus[userId]['prevCard'] = newCard
-        keyboard = [
-            [
-                InlineKeyboardButton("High", callback_data="High"),
-                InlineKeyboardButton("Low", callback_data="Low"),
-            ]
-        ]
-        await query.message.edit_text(
-            f"{sGreeting}Current Card: {str(newCard['label'])}\nWhat is your next guess? High or Low?",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
-        return BETTINGHILO
+        None
 
 
 async def _high(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -713,6 +733,19 @@ async def _panelSlot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
     return AGAINSLOT
+
+########################################################################
+#                              +CoinFilp                               #
+########################################################################
+
+async def _heads(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    None
+
+async def _tails(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    None
+
+async def _cashoutCoinFlip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:  # TODO
+    None
 
 ########################################################################
 #                              +Deposit                                #
@@ -1789,6 +1822,9 @@ def main() -> None:
             BETTINGHILO:    [CallbackQueryHandler(_cashoutHilo, pattern="cashOutHilo"),
                              CallbackQueryHandler(_high, pattern="High"),
                              CallbackQueryHandler(_low, pattern="Low"),],
+            BETTINGCOINFLIP:    [CallbackQueryHandler(_cashoutCoinFlip, pattern="cashOutCoinFilp"),
+                             CallbackQueryHandler(_heads, pattern="Heads"),
+                             CallbackQueryHandler(_tails, pattern="Tails"),],
             COPY:           [CallbackQueryHandler(copyToClipboard, pattern="^copyToClipboard:"),
                              CallbackQueryHandler(cancel, pattern="Cancel")]
         },
