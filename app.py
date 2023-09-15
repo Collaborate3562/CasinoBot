@@ -65,6 +65,7 @@ from libs.util import (
     roll,
     getUnitString,
     controlRandCard,
+    _getRandCoin,
     getWallet,
     getBalance,
     deploySmartContract,
@@ -102,8 +103,8 @@ INFURA_ID = os.environ['INFURA_ID']
 BOT_TOKEN = os.environ['BOT_TOKEN']
 OWNER_ADDRESS = os.environ['OWNER_ADDRSS']
 
-MAIN, WALLET, SELECT, STATUS, PAYMENT, DEPOSIT, DISPLAY, COPY, LASTSELECT, AGAINSLOT, AGAINHILO, PANELHILO, PANELSLOT, BETTINGHILO, BETTINGCOINFLIP, PANELDEPOSIT, PANELWITHDRAW, PANELWITHDRAWADDRESS, PANELADVERTISE, CANCEL, ADSTIME, ADSURL, ADSDESC, ADSCONFIRM, ADSPAY, ADSPAYCONFIRM = range(
-    26)
+MAIN, WALLET, SELECT, STATUS, PAYMENT, DEPOSIT, DISPLAY, COPY, LASTSELECT, AGAINSLOT, AGAINHILO, AGAINCOINFLIP, PANELHILO, PANELSLOT, BETTINGHILO, BETTINGCOINFLIP, PANELDEPOSIT, PANELWITHDRAW, PANELWITHDRAWADDRESS, PANELADVERTISE, CANCEL, ADSTIME, ADSURL, ADSDESC, ADSCONFIRM, ADSPAY, ADSPAYCONFIRM = range(
+    27)
 ST_DEPOSIT, ST_WITHDRAW, ST_HILO, ST_COINFLIP, ST_SLOT, ST_ADS_PAY = range(6)
 ETH, BNB = range(2)
 
@@ -232,6 +233,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         "curTokenAmount": float(0),
         "tokenMode": int(0),
         "cashOutHiloCnt": int(0),
+        "finalCoin": None,
+        "coinHistory": "",
+        "cashOutCoinFlipCnt": int(0)
     }
     init(userId)
 
@@ -341,7 +345,6 @@ async def playHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     str_Guide = f"{g_HiloMark}Which token do you wanna bet?\n"
     return await eth_bnb_dlg(update, str_Guide)
 
-
 async def _playHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     userId = query.from_user.id
@@ -360,7 +363,6 @@ async def _playCoinFlip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     str_Guide = f"{g_CoinFlipMark}Which token do you wanna bet?\n"
     return await _eth_bnb_dlg(update, str_Guide)
 
-
 async def _panelHiloOrCoinFlip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     global g_UserStatus
@@ -370,10 +372,10 @@ async def _panelHiloOrCoinFlip(update: Update, context: ContextTypes.DEFAULT_TYP
 
     userId = query.from_user.id
     
-    param = query.data.split(":")[1]
-    print('param', param)
+    status = g_UserStatus[userId]['status']
+    print(status)
     
-    if int(param) == 2: # ST_HILO
+    if status == ST_HILO: # ST_HILO
         if g_UserStatus[userId]['cashOutHiloCnt'] == 0:
             kind = "UserID=\"{}\"".format(userId)
             wallet = await readFieldsWhereStr("tbl_users", "Wallet", kind)
@@ -460,8 +462,8 @@ async def _panelHiloOrCoinFlip(update: Update, context: ContextTypes.DEFAULT_TYP
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
             return BETTINGHILO
-    elif int(param) == 3: # ST_COINFLIP
-        sGreeting = "CoinFlip Game started!\n\n"
+    elif status == ST_COINFLIP: # ST_COINFLIP
+        sGreeting = "CoinFlip Game started!\n"
         keyboard = [
             [
                 InlineKeyboardButton("Heads", callback_data="Heads"),
@@ -739,13 +741,141 @@ async def _panelSlot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 ########################################################################
 
 async def _heads(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    None
+    query = update.callback_query
+    userId = query.from_user.id
+    global g_UserStatus
+    coinHistory = g_UserStatus[userId]['coinHistory']
+    
+    coin = _getRandCoin()
+    g_UserStatus[userId]['coinHistory'] = coinHistory + coin['label']
+    if coin['value'] == 0:
+        g_UserStatus[userId]['finalCoin'] = coin
+        g_UserStatus[userId]['cashOutCoinFlipCnt'] += 1
+        return await _panelHiloOrCoinFlip(update, context)
+    else:
+        sCoinHistory = g_UserStatus[userId]['coinHistory']
+        tokenMode = g_UserStatus[userId]['tokenMode']
+        tokenAmount = g_UserStatus[userId]['curTokenAmount']
+        init(userId)
+        g_UserStatus[userId]['tokenMode'] = tokenMode
+        g_UserStatus[userId]['curTokenAmount'] = tokenAmount
+        g_UserStatus[userId]['cashOutCoinFlipCnt'] = 0
+        
+        kind = "UserID=\"{}\"".format(userId)
+        wallet = await readFieldsWhereStr("tbl_users", "Wallet", kind)
+        address = wallet[0][0]
+        web3 = None
+        tokenMode = g_UserStatus[userId]['tokenMode']
+        if tokenMode == ETH:
+            web3 = g_ETH_Web3
+        else:
+            web3 = g_BSC_Web3
+        f_Balance = await getBalance(address, web3, userId)
+
+        keyboard = [
+            [
+                InlineKeyboardButton("Play Again", callback_data="againCoinFlip"),
+                InlineKeyboardButton("Change Bet", callback_data="changeBet"),
+                InlineKeyboardButton("Cancel", callback_data="Cancel"),
+            ]
+        ]
+        await query.message.edit_text(
+            f"Busted! ❌\n\n{sCoinHistory}\n\nFinal Coin:{coin['label']}\n\nDo you want to play again?\n\nBalance:{f_Balance} {getUnitString(tokenMode)}",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return AGAINCOINFLIP
 
 async def _tails(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    None
+    query = update.callback_query
+    userId = query.from_user.id
+    global g_UserStatus
+    coinHistory = g_UserStatus[userId]['coinHistory']
+    
+    coin = _getRandCoin()
+    g_UserStatus[userId]['coinHistory'] = coinHistory + coin['label']
+    if coin['value'] == 1:
+        g_UserStatus[userId]['finalCoin'] = coin
+        g_UserStatus[userId]['cashOutCoinFlipCnt'] += 1
+        return await _panelHiloOrCoinFlip(update, context)
+    else:
+        sCoinHistory = g_UserStatus[userId]['coinHistory']
+        tokenMode = g_UserStatus[userId]['tokenMode']
+        tokenAmount = g_UserStatus[userId]['curTokenAmount']
+        init(userId)
+        g_UserStatus[userId]['tokenMode'] = tokenMode
+        g_UserStatus[userId]['curTokenAmount'] = tokenAmount
+        g_UserStatus[userId]['cashOutCoinFlipCnt'] = 0
+        
+        kind = "UserID=\"{}\"".format(userId)
+        wallet = await readFieldsWhereStr("tbl_users", "Wallet", kind)
+        address = wallet[0][0]
+        web3 = None
+        tokenMode = g_UserStatus[userId]['tokenMode']
+        if tokenMode == ETH:
+            web3 = g_ETH_Web3
+        else:
+            web3 = g_BSC_Web3
+        f_Balance = await getBalance(address, web3, userId)
+
+        keyboard = [
+            [
+                InlineKeyboardButton("Play Again", callback_data="againCoinFlip"),
+                InlineKeyboardButton("Change Bet", callback_data="changeBet"),
+                InlineKeyboardButton("Cancel", callback_data="Cancel"),
+            ]
+        ]
+        await query.message.edit_text(
+            f"Busted! ❌\n\n{sCoinHistory}\n\nFinal Coin:{coin['label']}\n\nDo you want to play again?\n\nBalance:{f_Balance} {getUnitString(tokenMode)}",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return AGAINCOINFLIP
 
 async def _cashoutCoinFlip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:  # TODO
-    None
+    query = update.callback_query
+    userId = query.from_user.id
+    global g_UserStatus
+
+    kind = "UserID=\"{}\"".format(userId)
+    wallet = await readFieldsWhereStr("tbl_users", "Wallet", kind)
+    address = wallet[0][0]
+    web3 = None
+    field = "ETH_Amount"
+    winsField = "ETH_Wins"
+    tokenMode = g_UserStatus[userId]['tokenMode']
+    if tokenMode == ETH:
+        web3 = g_ETH_Web3
+    else:
+        web3 = g_BSC_Web3
+        field = "BNB_Amount"
+        winsField = "BNB_Wins"
+    f_Balance = await getBalance(address, web3, userId)
+
+    cashOutId = g_UserStatus[userId]['cashOutCoinFlipCnt']
+    tokenMode = g_UserStatus[userId]['tokenMode']
+    curTokenAmount = g_UserStatus[userId]['curTokenAmount']
+    init(userId)
+    g_UserStatus[userId]['curTokenAmount'] = curTokenAmount
+    profit = curTokenAmount * g_HiloCashOut[cashOutId]
+    await updateSetFloatWhereStr("tbl_users", field, (f_Balance + profit), "UserID", userId)
+
+    previousWins = await readFieldsWhereStr("tbl_users", winsField, kind)
+    oldWagerAmount = float(previousWins[0][0])
+    await updateSetFloatWhereStr("tbl_users", winsField, oldWagerAmount + profit - curTokenAmount, "UserID", userId)
+
+    f_Balance = await getBalance(address, web3, userId)
+    keyboard = [
+        [
+            InlineKeyboardButton("Play Again", callback_data="againCoinFlip"),
+            InlineKeyboardButton("Change Bet", callback_data="changeBet"),
+            InlineKeyboardButton("Cancel", callback_data="Cancel"),
+        ]
+    ]
+    await query.message.edit_text(
+        f"🏆🏆🏆\n\nYou won!\n\nCashout : x{g_HiloCashOut[cashOutId]}\nCashout : " + "{:.4f}".format(
+            profit) + getUnitString(tokenMode) + f"\nBalance:{f_Balance} {getUnitString(tokenMode)}",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+    return AGAINCOINFLIP
 
 ########################################################################
 #                              +Deposit                                #
@@ -954,21 +1084,16 @@ async def confirm_dlg_game(update: Update, context: ContextTypes.DEFAULT_TYPE, m
 
     sPlayButton = ""
     sMark = ""
-    sCallBackData = ""
     status = g_UserStatus[userId]['status']
-    print(status)
     match status:
         case 2:  # ST_HILO
             sPlayButton = "Play"
-            sCallBackData = "Play:2"
             sMark = g_HiloMark
         case 3:  # ST_COINFLIP
             sPlayButton = "Play"
-            sCallBackData = "Play:3"
             sMark = g_CoinFlipMark
         case 4:  # ST_SLOT
             sPlayButton = "Roll"
-            sCallBackData = "Roll"
             sMark = g_SlotMark
 
     keyboard = [
@@ -978,7 +1103,7 @@ async def confirm_dlg_game(update: Update, context: ContextTypes.DEFAULT_TYPE, m
             InlineKeyboardButton("x2", callback_data="changeBetAmount:1"),
         ],
         [
-            InlineKeyboardButton(sPlayButton, callback_data=sCallBackData),
+            InlineKeyboardButton(sPlayButton, callback_data=sPlayButton),
         ]
     ]
     if tokenAmount > balance:
@@ -1695,6 +1820,9 @@ def init(userId: str):  # TODO
     g_UserStatus[userId]['curTokenAmount'] = float(0)
     g_UserStatus[userId]['tokenMode'] = ETH
     g_UserStatus[userId]['cashOutHiloCnt'] = int(0)
+    g_UserStatus[userId]['finalCoin'] = None
+    g_UserStatus[userId]['coinHistory'] = ""
+    g_UserStatus[userId]['cashOutCoinFlipCnt'] = int(0)
 
 ############################################################################
 #                               Incomplete                                 #
@@ -1791,7 +1919,7 @@ def main() -> None:
                              CallbackQueryHandler(cancel, pattern="Cancel")],
             LASTSELECT:    [CallbackQueryHandler(_changeBetAmount, pattern="^changeBetAmount:"),
                             CallbackQueryHandler(cancel, pattern="Cancel"),
-                            CallbackQueryHandler(_panelHiloOrCoinFlip, pattern="^Play:"),
+                            CallbackQueryHandler(_panelHiloOrCoinFlip, pattern="Play"),
                             CallbackQueryHandler(_panelSlot, pattern="Roll")],
             AGAINSLOT:      [CallbackQueryHandler(cancel, pattern="Cancel"),
                              CallbackQueryHandler(
@@ -1801,6 +1929,10 @@ def main() -> None:
                              CallbackQueryHandler(
                                  _panelHiloOrCoinFlip, pattern="againHilo"),
                              CallbackQueryHandler(_playHilo, pattern="changeBet")],
+            AGAINCOINFLIP:      [CallbackQueryHandler(cancel, pattern="Cancel"),
+                             CallbackQueryHandler(
+                                 _panelHiloOrCoinFlip, pattern="againCoinFlip"),
+                             CallbackQueryHandler(_playCoinFlip, pattern="changeBet")],
             PANELDEPOSIT:   [MessageHandler(filters.TEXT, panelDeposit)],
             CANCEL:         [CallbackQueryHandler(cancel, pattern="Cancel")],
             ADSTIME:        [CallbackQueryHandler(_adsTime, pattern="^adsTime:"),

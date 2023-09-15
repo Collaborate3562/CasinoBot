@@ -36,6 +36,7 @@ PERCENTAGE = 1000
 ETH_FIXED_WITHDRAW_FEE = float(1)
 BSC_FIXED_WITHDRAW_FEE = float(0.3)
 
+g_Coins = ['🟡', '⚪']
 g_Flowers = ['♠️', '♥️', '♣️', '♦️']
 g_Numbers = ['A','2','3','4','5','6','7','8','9','10','J','Q','K']
 g_SlotCashOut = [18.0, 3.0, 1.3, 1.05]
@@ -502,6 +503,19 @@ def _getRandCard(CardHistory : str) -> dict:
     d['value'] = num
     d['label'] = random.choice(g_Flowers) + g_Numbers[num-1]
     return d
+
+def _getRandCoin() -> dict:
+    coin = dict()
+    _rand = random.randint(1, 1000)
+    
+    if _rand % 2 == 0: # Heads
+        coin['value'] = _rand % 2
+        coin['label'] = g_Coins[_rand % 2]
+    else: # Tails
+        coin['value'] = _rand % 2
+        coin['label'] = g_Coins[_rand % 2]
+    
+    return coin
 
 def _getCell(num : int) -> str:
     cell = ""
