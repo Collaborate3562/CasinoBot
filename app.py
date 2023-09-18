@@ -463,18 +463,84 @@ async def _panelHiloOrCoinFlip(update: Update, context: ContextTypes.DEFAULT_TYP
             )
             return BETTINGHILO
     elif status == ST_COINFLIP: # ST_COINFLIP
-        sGreeting = "CoinFlip Game started!\n"
-        keyboard = [
-            [
-                InlineKeyboardButton("Heads", callback_data="Heads"),
-                InlineKeyboardButton("Tails", callback_data="Tails"),
+        if g_UserStatus[userId]['cashOutCoinFlipCnt'] == 0:
+            kind = "UserID=\"{}\"".format(userId)
+            wallet = await readFieldsWhereStr("tbl_users", "Wallet", kind)
+            address = wallet[0][0]
+            web3 = None
+            field = "ETH_Amount"
+            wagerField = "ETH_Wagered"
+            tokenMode = g_UserStatus[userId]['tokenMode']
+
+            if tokenMode == ETH:
+                web3 = g_ETH_Web3
+            else:
+                web3 = g_BSC_Web3
+                field = "BNB_Amount"
+                wagerField = "BNB_Wagered"
+
+            f_Balance = await getBalance(address, web3, userId)
+            if float(f_Balance) <= 0:
+                keyboard = [
+                    [
+                        InlineKeyboardButton("Deposit", callback_data="Deposit"),
+                        InlineKeyboardButton("Back", callback_data="Cancel"),
+                    ]
+                ]
+                await query.message.edit_text(
+                    "Insufficient funds!\nPlease deposit more funds",
+                    reply_markup=InlineKeyboardMarkup(keyboard)
+                )
+
+                return CANCEL & MAIN
+
+            tokenAmount = g_UserStatus[userId]['curTokenAmount']
+            if float(f_Balance) <= tokenAmount:
+                tokenAmount = float(f_Balance)
+                g_UserStatus[userId]['curTokenAmount'] = float(f_Balance)
+
+            print(f_Balance)
+            print(tokenAmount)
+            await updateSetFloatWhereStr("tbl_users", field, f_Balance - tokenAmount, "UserID", userId)
+
+            previousWagered = await readFieldsWhereStr("tbl_users", wagerField, kind)
+            oldWagerAmount = float(previousWagered[0][0])
+            await updateSetFloatWhereStr("tbl_users", wagerField, oldWagerAmount + tokenAmount, "UserID", userId)
+    
+        coinHistory = g_UserStatus[userId]['coinHistory']
+        finalCoin = g_UserStatus[userId]['finalCoin']
+
+        cashOutId = g_UserStatus[userId]['cashOutCoinFlipCnt']
+        if cashOutId > 0:
+            sGreeting = f"You Won!🎉\n{coinHistory}\n"
+            keyboard = [
+                [
+                    InlineKeyboardButton("Heads", callback_data="Heads"),
+                    InlineKeyboardButton("Tails", callback_data="Tails"),
+                ],
+                [
+                    InlineKeyboardButton("Cashout", callback_data="cashOutCoinFlip"),
+                ]
             ]
-        ]
-        await query.message.edit_text(
-            f"{sGreeting}\nWhat is your next guess? Heads or Tails?",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
-        return BETTINGCOINFLIP
+            await query.message.edit_text(
+                f"{sGreeting}Current Coin: {str(finalCoin['label'])}\n\nCashout : x{g_HiloCashOut[cashOutId]}\nCashout:" + "{:.4f}".format(
+                    g_UserStatus[userId]['curTokenAmount'] * g_HiloCashOut[cashOutId]) + getUnitString(g_UserStatus[userId]['tokenMode']) + "\nWhat is your next guess? Heads or Tails?",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+            return BETTINGCOINFLIP
+        else:
+            sGreeting = "CoinFlip Game started!\n"
+            keyboard = [
+                [
+                    InlineKeyboardButton("Heads", callback_data="Heads"),
+                    InlineKeyboardButton("Tails", callback_data="Tails"),
+                ]
+            ]
+            await query.message.edit_text(
+                f"{sGreeting}\nWhat is your next guess? Heads or Tails?",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+            return BETTINGCOINFLIP
     else:
         None
 
@@ -1954,7 +2020,7 @@ def main() -> None:
             BETTINGHILO:    [CallbackQueryHandler(_cashoutHilo, pattern="cashOutHilo"),
                              CallbackQueryHandler(_high, pattern="High"),
                              CallbackQueryHandler(_low, pattern="Low"),],
-            BETTINGCOINFLIP:    [CallbackQueryHandler(_cashoutCoinFlip, pattern="cashOutCoinFilp"),
+            BETTINGCOINFLIP:    [CallbackQueryHandler(_cashoutCoinFlip, pattern="cashOutCoinFlip"),
                              CallbackQueryHandler(_heads, pattern="Heads"),
                              CallbackQueryHandler(_tails, pattern="Tails"),],
             COPY:           [CallbackQueryHandler(copyToClipboard, pattern="^copyToClipboard:"),
