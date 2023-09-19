@@ -1464,6 +1464,8 @@ async def panelWithdrawAddress(update: Update, context: ContextTypes.DEFAULT_TYP
         tokenMode = g_UserStatus[userId]['withdrawTokenType']
     else:
         tokenMode = g_UserStatus[userId]['advertise']['adsPayTokenType']
+        
+    print('withdraw tokenMode', tokenMode)
 
     if tokenMode == ETH or tokenMode == CUSTOMTOKEN:
         web3 = g_ETH_Web3
@@ -1490,8 +1492,8 @@ async def panelWithdrawAddress(update: Update, context: ContextTypes.DEFAULT_TYP
     fee = float(0)
     fixedFee = float(0)
     if g_UserStatus[userId]['status'] == ST_WITHDRAW:
-        fee = await calculateTotalWithdrawFee(web3, float(amount))
-        fixedFee = await calculateFixedFee(web3)
+        fee = await calculateTotalWithdrawFee(web3, float(amount), tokenMode)
+        fixedFee = await calculateFixedFee(web3, tokenMode)
         if fee > float(amount):
             await update.message.reply_text(
                 "Withdraw amount must be bigger than fee.\nFee is House cut(5%) and gas(${}).\nCurrent House cut is {} {}.$1 is {} {}\n".format(
@@ -1550,10 +1552,10 @@ async def panelWithdraw(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         contract = g_ETH_Contract
         scanUri = TEST_ETH_SCAN_URI
         if tokenMode == CUSTOMTOKEN:
-            mode = 1
+            mode = 2
     else:
         w3 = g_BSC_Web3
-        mode = 2
+        mode = 1
         contract = g_BSC_Contract
         scanUri = TEST_BSC_SCAN_URI
 
@@ -1572,7 +1574,7 @@ async def panelWithdraw(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     wallet = text.split('/')[1]
 
     if tokenMode == CUSTOMTOKEN:
-        tx = await withdrawTokenAmount(w3, contract, wallet, amount, userId, mode)
+        tx = await withdrawTokenAmount(w3, contract, TOKEN_CONTRACT_ADDRESS, wallet, amount, userId, mode)
     else:
         tx = await withdrawAmount(w3, contract, wallet, amount, userId)
         

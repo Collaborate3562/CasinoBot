@@ -43,7 +43,6 @@ g_SlotCashOut = [18.0, 3.0, 1.3, 1.05]
 g_CntSymbol = 6
 
 async def getPricefromAmount(amount : float, kind : int) -> float:
-    print('kind', kind)
     value = 0
     if kind == 0 :
         price = await readFieldsWhereStr('tbl_cryptos', 'Price', 'Symbol=\'eth\'')
@@ -402,8 +401,9 @@ async def withdrawAmount(web3: any, contract: any, withdrawalAddress: str, amoun
         call_function = None
         field = ""
 
-        fee = await calculateTotalWithdrawFee(web3, amount)
+        fee = 0
         if chain_id == int(ETH_TESTNET_ID):
+            fee = await calculateTotalWithdrawFee(web3, amount, 0)
             call_function = contract.functions.withdraw(withdrawalAddress, web3.toWei(amount - fee, 'ether')).buildTransaction({
                 "chainId": chain_id,
                 "from": OWNER_ADDRESS,
@@ -411,6 +411,7 @@ async def withdrawAmount(web3: any, contract: any, withdrawalAddress: str, amoun
             })
             field = "ETH_Amount"
         else:
+            fee = await calculateTotalWithdrawFee(web3, amount, 1)
             call_function = contract.functions.withdraw(withdrawalAddress, web3.toWei(amount - fee, 'ether')).buildTransaction({
                 "chainId": chain_id,
                 "from": OWNER_ADDRESS,
@@ -449,7 +450,7 @@ async def withdrawTokenAmount(web3: any, contract: any, token: str, withdrawalAd
         field = ""
 
         fee = await calculateTotalWithdrawFee(web3, amount, mode)
-        call_function = contract.functions.withdrawCustomToken(withdrawalAddress, web3.toWei(amount - fee, 'ether')).buildTransaction({
+        call_function = contract.functions.withdrawCustomToken(token, withdrawalAddress, web3.toWei(amount - fee, 'ether')).buildTransaction({
             "chainId": chain_id,
             "from": OWNER_ADDRESS,
             "nonce": nonce
@@ -491,19 +492,19 @@ async def calculateTotalWithdrawFee(web3: any, amount: float, mode: int) -> floa
 async def calculateFixedFee(web3: any, mode: int) -> float:
     res = float(0)
     try:
+        print(mode)
         price = 0
-        chain_id = web3.eth.chain_id
         if mode == 0:
             price = await readFieldsWhereStr('tbl_cryptos', 'Price', 'Symbol=\'eth\'')
             price = price[0][0]
 
             res = ETH_FIXED_WITHDRAW_FEE / float(price)
-        elif mode == 2:
+        elif mode == 1:
             price = await readFieldsWhereStr('tbl_cryptos', 'Price', 'Symbol=\'bnb\'')
             price = price[0][0]
 
             res = BSC_FIXED_WITHDRAW_FEE / float(price)
-        elif mode == 1:
+        elif mode == 2:
             price = await readFieldsWhereStr('tbl_cryptos', 'Price', 'Symbol=\'token\'')
             price = price[0][0]
 
