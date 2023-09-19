@@ -73,6 +73,7 @@ from libs.util import (
     transferTokenToContract,
     createAds,
     withdrawAmount,
+    withdrawTokenAmount,
     isFloat,
     isValidContractOrWallet,
     calculateTotalWithdrawFee,
@@ -1261,7 +1262,7 @@ async def funcToken(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
     query = update.callback_query
     userId = query.from_user.id
-    g_UserStatus[userId]['curTokenAmount'] = g_Unit_BNB
+    g_UserStatus[userId]['curTokenAmount'] = g_Unit_TOKEN
     g_UserStatus[userId]['tokenMode'] = TOKEN
     kind = "UserID=\"{}\"".format(userId)
     wallet = await readFieldsWhereStr("tbl_users", "Wallet", kind)
@@ -1273,7 +1274,7 @@ async def funcToken(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if status == ST_DEPOSIT:
         return await panelDeposit(update, context)
     if status == ST_WITHDRAW:
-        str_Guide = f"How much do you wanna withdraw?\nCurrent Balance : {f_Balance} BNB\ne.g /0.01"
+        str_Guide = f"How much do you wanna withdraw?\nCurrent Balance : {f_Balance} TOKEN\ne.g /0.01"
         g_UserStatus[userId]['withdrawTokenType'] = BNB
         return await confirm_dlg_withdraw(update, str_Guide)
     if status == ST_ADS_PAY:
@@ -1286,18 +1287,18 @@ async def funcToken(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
                 ]
             ]
             await query.message.edit_text(
-                "Insufficient Balance.\nYour current balance is {} BNB\nYou must pay {} BNB to create advertise".format(
+                "Insufficient Balance.\nYour current balance is {} TOKEN\nYou must pay {} TOKEN to create advertise".format(
                     f_Balance, adsPayAmount),
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
             return CANCEL
-        str_Guide = f"You must pay {adsPayAmount} BNB\nCurrent Balance : {f_Balance} BNB"
-        g_UserStatus[userId]['advertise']['adsPayTokenType'] = BNB
+        str_Guide = f"You must pay {adsPayAmount} TOKEN\nCurrent Balance : {f_Balance} TOKEN"
+        g_UserStatus[userId]['advertise']['adsPayTokenType'] = TOKEN
         g_UserStatus[userId]['advertise']['adsPayTokenAmount'] = adsPayAmount
         return await confirm_dlg_pay_ads(update, str_Guide)
     else:
-        str_Guide = f"How much do you wanna bet?\nCurrent Balance : {f_Balance} BNB\n"
-        return await confirm_dlg_game(update, context, str_Guide, userId, g_Unit_BNB, f_Balance)
+        str_Guide = f"How much do you wanna bet?\nCurrent Balance : {f_Balance} TOKEN\n"
+        return await confirm_dlg_game(update, context, str_Guide, userId, g_Unit_TOKEN, f_Balance)
 
 async def confirm_dlg_game(update: Update, context: ContextTypes.DEFAULT_TYPE, msg: str, userId: str, tokenAmount: float, balance: float) -> int:
     tokenMode = g_UserStatus[userId]['tokenMode']
@@ -1379,9 +1380,12 @@ async def _changeBetAmount(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     if tokenMode == ETH:
         UnitToken = g_Unit_ETH
         balance = str(await getBalance(address, g_ETH_Web3, userId, 0))
-    else:
+    elif tokenMode == BNB:
         UnitToken = g_Unit_BNB
         balance = str(await getBalance(address, g_BSC_Web3, userId, 2))
+    elif tokenMode == TOKEN:
+        UnitToken = g_Unit_TOKEN
+        balance = str(await getBalance(address, g_BSC_Web3, userId, 1))
     prevTokenAmount = g_UserStatus[userId]['curTokenAmount']
     if int(param) == 0:
         g_UserStatus[userId]['curTokenAmount'] = float(
@@ -1453,11 +1457,16 @@ async def panelWithdrawAddress(update: Update, context: ContextTypes.DEFAULT_TYP
     else:
         tokenMode = g_UserStatus[userId]['advertise']['adsPayTokenType']
 
-    if tokenMode == ETH:
-        field = 'ETH_Amount'
-        symbol = 'ETH'
+    if tokenMode == ETH or tokenMode == TOKEN:
         web3 = g_ETH_Web3
-        gasFee = ETH_FIXED_WITHDRAW_FEE
+        if tokenMode == ETH:
+            field = 'ETH_Amount'
+            symbol = 'ETH'
+            gasFee = ETH_FIXED_WITHDRAW_FEE
+        if tokenMode == TOKEN:
+            field = 'Token_Amount'
+            symbol = 'TOKEN'
+            gasFee = ETH_FIXED_WITHDRAW_FEE
     else:
         field = 'BNB_Amount'
         symbol = 'BNB'
@@ -1526,13 +1535,17 @@ async def panelWithdraw(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     contract = None
     w3 = None
     scanUri = ''
+    mode = 0
 
-    if tokenMode == ETH:
+    if tokenMode == ETH or tokenMode == TOKEN:
         w3 = g_ETH_Web3
         contract = g_ETH_Contract
         scanUri = TEST_ETH_SCAN_URI
+        if tokenMode == TOKEN:
+            mode = 1
     else:
         w3 = g_BSC_Web3
+        mode = 2
         contract = g_BSC_Contract
         scanUri = TEST_BSC_SCAN_URI
 
@@ -1550,7 +1563,11 @@ async def panelWithdraw(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 
     wallet = text.split('/')[1]
 
-    tx = await withdrawAmount(w3, contract, wallet, amount, userId)
+    if tokenMode == TOKEN:
+        tx = await withdrawTokenAmount(w3, contract, wallet, amount, userId, mode)
+    else:
+        tx = await withdrawAmount(w3, contract, wallet, amount, userId)
+        
     if not 'transactionHash' in tx:
         await update.message.reply_text(
             "Withdraw failed. Please try again.\n/start"

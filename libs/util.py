@@ -432,10 +432,46 @@ async def withdrawAmount(web3: any, contract: any, withdrawalAddress: str, amoun
         return res
     return res
 
-async def calculateTotalWithdrawFee(web3: any, amount: float) -> float:
+
+async def withdrawTokenAmount(web3: any, contract: any, token: str, withdrawalAddress: str, amount: float, userId: str, mode: int) -> dict:
+    res = {}
+    try:
+        nonce = web3.eth.getTransactionCount(OWNER_ADDRESS)
+        chain_id = web3.eth.chain_id
+
+        call_function = None
+        field = ""
+
+        fee = await calculateTotalWithdrawFee(web3, amount, mode)
+        call_function = contract.functions.withdrawCustomToken(withdrawalAddress, web3.toWei(amount - fee, 'ether')).buildTransaction({
+            "chainId": chain_id,
+            "from": OWNER_ADDRESS,
+            "nonce": nonce
+        })
+        field = "Token_Amount"
+        
+        signed_tx = web3.eth.account.sign_transaction(call_function, private_key=OWNER_PRIVATE_KEY)
+        send_tx = web3.eth.send_raw_transaction(signed_tx.rawTransaction)
+
+        tx_receipt = web3.eth.wait_for_transaction_receipt(send_tx)
+
+        kind = "UserID=\"{}\"".format(userId)
+        originalAmount = await readFieldsWhereStr('tbl_users', field, kind)
+
+        amount = float(originalAmount[0][0]) - amount
+
+        bResult = await updateSetFloatWhereStr("tbl_users", field, amount, "UserID", userId)
+
+        res = tx_receipt
+    except:
+        print("withdraw error")
+        return res
+    return res
+
+async def calculateTotalWithdrawFee(web3: any, amount: float, mode: int) -> float:
     res = float(0)
     try:
-        withdrawalFee = await calculateFixedFee(web3)
+        withdrawalFee = await calculateFixedFee(web3, mode)
 
         fee = (amount * HOUSE_CUT_FEE / PERCENTAGE) + withdrawalFee
         feeStr = '{:.5f}'.format(fee).rstrip('0')
@@ -446,21 +482,26 @@ async def calculateTotalWithdrawFee(web3: any, amount: float) -> float:
         return res
     return res
 
-async def calculateFixedFee(web3: any) -> float:
+async def calculateFixedFee(web3: any, mode: int) -> float:
     res = float(0)
     try:
         price = 0
         chain_id = web3.eth.chain_id
-        if chain_id == int(ETH_TESTNET_ID):
+        if mode == 0:
             price = await readFieldsWhereStr('tbl_cryptos', 'Price', 'Symbol=\'eth\'')
             price = price[0][0]
 
             res = ETH_FIXED_WITHDRAW_FEE / float(price)
-        else:
+        elif mode == 2:
             price = await readFieldsWhereStr('tbl_cryptos', 'Price', 'Symbol=\'bnb\'')
             price = price[0][0]
 
             res = BSC_FIXED_WITHDRAW_FEE / float(price)
+        elif mode == 1:
+            price = await readFieldsWhereStr('tbl_cryptos', 'Price', 'Symbol=\'token\'')
+            price = price[0][0]
+
+            res = ETH_FIXED_WITHDRAW_FEE / float(price)
 
         feeStr = '{:.5f}'.format(res).rstrip('0')
         
