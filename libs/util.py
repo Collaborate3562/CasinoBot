@@ -43,6 +43,7 @@ g_SlotCashOut = [18.0, 3.0, 1.3, 1.05]
 g_CntSymbol = 6
 
 async def getPricefromAmount(amount : float, kind : int) -> float:
+    print('kind', kind)
     value = 0
     if kind == 0 :
         price = await readFieldsWhereStr('tbl_cryptos', 'Price', 'Symbol=\'eth\'')
@@ -55,6 +56,7 @@ async def getPricefromAmount(amount : float, kind : int) -> float:
     elif kind == 2 :
         price = await readFieldsWhereStr('tbl_cryptos', 'Price', 'Symbol=\'token\'')
         price = price[0][0]
+        print('price', price)
         value = amount * price
     return value
 
