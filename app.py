@@ -129,6 +129,7 @@ g_Wallet = f"/wallet - Show all balances in your wallet\n"
 g_Deposit = f"/deposit - Deposit ETH or BNB into your wallet\n"
 g_Withdraw = f"/withdraw - Withdraw ETH or BNB from your wallet\n"
 g_Hilo = f"/hilo - Play hilo casino game\n  "
+g_CoinFilp = f"/coinflip - Play Coinflip game\n  "
 g_SlotHelp1 = f"   Three 7 symbols\n     7️⃣ | 7️⃣ |7️⃣ => x{g_SlotCashOut[0]}\n"
 g_SlotHelp2 = f"   Any three of a kind\n    🍎 | 🍎 | 🍎 => x{g_SlotCashOut[1]}\n"
 g_SlotHelp3 = f"   Any pair of 7 symbol\n    7️⃣ | 🌺 | 7️⃣ => x{g_SlotCashOut[2]}\n"
@@ -1600,7 +1601,7 @@ async def help(update: Update, context: CallbackContext) -> int:
 
     await update.message.reply_text(
         g_Greetings + g_Help + g_Wallet + g_Deposit + g_Withdraw +
-        g_Hilo + g_Slot + g_LeaderBoard + g_AdsBoard,
+        g_Hilo + g_CoinFilp +g_Slot + g_LeaderBoard + g_AdsBoard,
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
@@ -1617,7 +1618,7 @@ async def _help(update: Update, context: CallbackContext) -> None:
     ]
     await query.message.edit_text(
         g_Greetings + g_Help + g_Wallet + g_Deposit + g_Withdraw +
-        g_Hilo + g_Slot + g_LeaderBoard + g_AdsBoard,
+        g_Hilo + g_CoinFilp + g_Slot + g_LeaderBoard + g_AdsBoard,
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
