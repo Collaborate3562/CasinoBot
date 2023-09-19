@@ -151,8 +151,10 @@ def getUnitString(kind: int) -> str:
     str = ""
     if kind == 0 :
         str = "ETH"
-    else :
+    elif kind == 1:
         str = "BNB"
+    elif kind == 2:
+        str = "TOKEN"
     return str
 
 def controlRandCard(high : bool, CardHistory : str, PrevCard : dict) -> dict:
@@ -228,7 +230,7 @@ async def getWallet(userId: str, userName: str, fullName: str, isBot: bool, ethC
 
     return wallet
 
-async def getBalance(address: str, web3: any, userId: str) -> float:
+async def getBalance(address: str, web3: any, userId: str, mode: int) -> float:
     nBalance = 0
     
     chain_id = web3.eth.chain_id
@@ -236,7 +238,10 @@ async def getBalance(address: str, web3: any, userId: str) -> float:
     balance = None
     kind = "UserID=\"{}\"".format(userId)
     if chain_id == int(ETH_TESTNET_ID):
-        balance = await readFieldsWhereStr('tbl_users', 'ETH_Amount', kind)
+        if mode == 0:
+            balance = await readFieldsWhereStr('tbl_users', 'ETH_Amount', kind)
+        if mode == 1:
+            balance = await readFieldsWhereStr('tbl_users', 'Token_Amount', kind)
     else:
         balance = await readFieldsWhereStr('tbl_users', 'BNB_Amount', kind)
 

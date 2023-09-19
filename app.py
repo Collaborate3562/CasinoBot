@@ -108,7 +108,7 @@ OWNER_ADDRESS = os.environ['OWNER_ADDRSS']
 MAIN, WALLET, SELECT, STATUS, PAYMENT, DEPOSIT, DISPLAY, COPY, LASTSELECT, AGAINSLOT, AGAINHILO, AGAINCOINFLIP, PANELHILO, PANELSLOT, BETTINGHILO, BETTINGCOINFLIP, PANELDEPOSIT, PANELWITHDRAW, PANELWITHDRAWADDRESS, PANELADVERTISE, CANCEL, ADSTIME, ADSURL, ADSDESC, ADSCONFIRM, ADSPAY, ADSPAYCONFIRM = range(
     27)
 ST_DEPOSIT, ST_WITHDRAW, ST_HILO, ST_COINFLIP, ST_SLOT, ST_ADS_PAY = range(6)
-ETH, BNB = range(2)
+ETH, BNB, TOKEN = range(3)
 
 HOUSE_CUT_FEE = 50
 PERCENTAGE = 1000
@@ -138,6 +138,7 @@ g_LeaderBoard = f"/board - Show the leaderboard\n"
 g_AdsBoard = f"/advertise - Show the ads at the time\n"
 g_Unit_ETH = 0.0005
 g_Unit_BNB = 0.003
+g_Unit_TOKEN = 1
 g_SlotCashout = 1.9
 g_HiloCashOut = (0, 1.32, 1.76, 2.34, 3.12, 4.17, 5.56, 7.41, 9.88, 13.18,
                  16.91, 25.37, 38.05, 198.0, 396.0, 792.0, 1584.0, 3168.0, 6336.0, 12672.0)
@@ -290,8 +291,9 @@ async def wallet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     wallet = await readFieldsWhereStr("tbl_users", "Wallet", kind)
 
     address = wallet[0][0]
-    eth_amount = await getBalance(address, g_ETH_Web3, userId)
-    bnb_amount = await getBalance(address, g_BSC_Web3, userId)
+    eth_amount = await getBalance(address, g_ETH_Web3, userId, 0)
+    token_amount = await getBalance(address, g_ETH_Web3, userId, 1)
+    bnb_amount = await getBalance(address, g_BSC_Web3, userId, 2)
 
     keyboard = [
         [
@@ -299,7 +301,7 @@ async def wallet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         ]
     ]
     await update.message.reply_text(
-        f"@{userName}'s wallet\nAddress: {address}\nETH : {eth_amount}\nBNB : {bnb_amount}",
+        f"@{userName}'s wallet\nAddress: {address}\nETH : {eth_amount}\nTOKEN : {token_amount}",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
@@ -318,8 +320,9 @@ async def _wallet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     userName = await readFieldsWhereStr("tbl_users", "UserName", kind)
     userName = userName[0][0]
 
-    eth_amount = await getBalance(address, g_ETH_Web3, userId)
-    bnb_amount = await getBalance(address, g_BSC_Web3, userId)
+    eth_amount = await getBalance(address, g_ETH_Web3, userId, 0)
+    token_amount = await getBalance(address, g_ETH_Web3, userId, 1)
+    bnb_amount = await getBalance(address, g_BSC_Web3, userId, 2)
 
     keyboard = [
         [
@@ -327,7 +330,7 @@ async def _wallet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         ]
     ]
     await query.message.edit_text(
-        f"@{userName}'s wallet\nAddress : {address}\nETH : {eth_amount}\nBNB : {bnb_amount}",
+        f"@{userName}'s wallet\nAddress : {address}\nETH : {eth_amount}\nTOKEN : {token_amount}",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
@@ -387,15 +390,21 @@ async def _panelHiloOrCoinFlip(update: Update, context: ContextTypes.DEFAULT_TYP
             field = "ETH_Amount"
             wagerField = "ETH_Wagered"
             tokenMode = g_UserStatus[userId]['tokenMode']
+            mode = 0
 
             if tokenMode == ETH:
                 web3 = g_ETH_Web3
-            else:
+            elif tokenMode == BNB:
                 web3 = g_BSC_Web3
+                mode = 2
                 field = "BNB_Amount"
                 wagerField = "BNB_Wagered"
+            else:
+                mode = 1
+                field = "Token_Amount"
+                wagerField = "Token_Wagered"
 
-            f_Balance = await getBalance(address, web3, userId)
+            f_Balance = await getBalance(address, web3, userId, mode)
             if float(f_Balance) <= 0:
                 keyboard = [
                     [
@@ -468,15 +477,21 @@ async def _panelHiloOrCoinFlip(update: Update, context: ContextTypes.DEFAULT_TYP
         field = "ETH_Amount"
         wagerField = "ETH_Wagered"
         tokenMode = g_UserStatus[userId]['tokenMode']
+        mode = 0
 
         if tokenMode == ETH:
             web3 = g_ETH_Web3
-        else:
+        elif tokenMode == BNB:
             web3 = g_BSC_Web3
+            mode = 2
             field = "BNB_Amount"
             wagerField = "BNB_Wagered"
+        else:
+            mode = 1
+            field = "Token_Amount"
+            wagerField = "Token_Wagered"
 
-        f_Balance = await getBalance(address, web3, userId)
+        f_Balance = await getBalance(address, web3, userId, mode)
         if float(f_Balance) <= 0:
             keyboard = [
                 [
@@ -571,11 +586,15 @@ async def _high(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         address = wallet[0][0]
         web3 = None
         tokenMode = g_UserStatus[userId]['tokenMode']
-        if tokenMode == ETH:
+        mode = 0
+        if tokenMode == ETH or tokenMode == TOKEN:
             web3 = g_ETH_Web3
+            if tokenMode == TOKEN:
+                mode = 1
         else:
             web3 = g_BSC_Web3
-        f_Balance = await getBalance(address, web3, userId)
+            mode = 2
+        f_Balance = await getBalance(address, web3, userId, mode)
 
         keyboard = [
             [
@@ -622,11 +641,15 @@ async def _low(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         address = wallet[0][0]
         web3 = None
         tokenMode = g_UserStatus[userId]['tokenMode']
-        if tokenMode == ETH:
+        mode = 0
+        if tokenMode == ETH or tokenMode == TOKEN:
             web3 = g_ETH_Web3
+            if tokenMode == TOKEN:
+                mode = 1
         else:
             web3 = g_BSC_Web3
-        f_Balance = await getBalance(address, web3, userId)
+            mode = 2
+        f_Balance = await getBalance(address, web3, userId, mode)
 
         keyboard = [
             [
@@ -654,13 +677,19 @@ async def _cashoutHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     field = "ETH_Amount"
     winsField = "ETH_Wins"
     tokenMode = g_UserStatus[userId]['tokenMode']
-    if tokenMode == ETH:
+    mode = 0
+    if tokenMode == ETH or tokenMode == TOKEN:
         web3 = g_ETH_Web3
+        if tokenMode == TOKEN:
+            mode = 1
+            field = "Token_Amount"
+            winsField = "Token_Wins"
     else:
         web3 = g_BSC_Web3
+        mode = 2
         field = "BNB_Amount"
         winsField = "BNB_Wins"
-    f_Balance = await getBalance(address, web3, userId)
+    f_Balance = await getBalance(address, web3, userId, mode)
 
     cashOutId = g_UserStatus[userId]['cashOutHiloCnt']
     tokenMode = g_UserStatus[userId]['tokenMode']
@@ -674,7 +703,7 @@ async def _cashoutHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     oldWagerAmount = float(previousWins[0][0])
     await updateSetFloatWhereStr("tbl_users", winsField, oldWagerAmount + profit - curTokenAmount, "UserID", userId)
 
-    f_Balance = await getBalance(address, web3, userId)
+    f_Balance = await getBalance(address, web3, userId, mode)
     keyboard = [
         [
             InlineKeyboardButton("Play Again", callback_data="againHilo"),
@@ -731,16 +760,23 @@ async def _panelSlot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     wagerField = "ETH_Wagered"
     winsField = "ETH_Wins"
     tokenMode = g_UserStatus[userId]['tokenMode']
+    mode = 0
 
-    if tokenMode == ETH:
+    if tokenMode == ETH or tokenMode == TOKEN:
         web3 = g_ETH_Web3
+        if tokenMode == TOKEN:
+            mode = 1
+            field = "Token_Amount"
+            wagerField = "Token_Wagered"
+            winsField = "Token_Wins"
     else:
         web3 = g_BSC_Web3
+        mode = 2
         field = "BNB_Amount"
         wagerField = "BNB_Wagered"
         winsField = "BNB_Wins"
 
-    f_Balance = await getBalance(address, web3, userId)
+    f_Balance = await getBalance(address, web3, userId, mode)
 
     if float(f_Balance) <= 0:
         await query.message.edit_text(
@@ -807,13 +843,19 @@ async def _heads(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         field = "ETH_Amount"
         winsField = "ETH_Wins"
         tokenMode = g_UserStatus[userId]['tokenMode']
-        if tokenMode == ETH:
+        mode = 0
+        if tokenMode == ETH or tokenMode == TOKEN:
             web3 = g_ETH_Web3
+            if tokenMode == TOKEN:
+                mode = 1
+                field = "Token_Amount"
+                winsField = "Token_Wins"
         else:
             web3 = g_BSC_Web3
+            mode = 2
             field = "BNB_Amount"
             winsField = "BNB_Wins"
-        f_Balance = await getBalance(address, web3, userId)
+        f_Balance = await getBalance(address, web3, userId, mode)
 
         tokenMode = g_UserStatus[userId]['tokenMode']
         curTokenAmount = g_UserStatus[userId]['curTokenAmount']
@@ -852,11 +894,15 @@ async def _heads(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         address = wallet[0][0]
         web3 = None
         tokenMode = g_UserStatus[userId]['tokenMode']
-        if tokenMode == ETH:
+        mode = 0
+        if tokenMode == ETH or tokenMode == TOKEN:
             web3 = g_ETH_Web3
+            if tokenMode == TOKEN:
+                mode = 1
         else:
             web3 = g_BSC_Web3
-        f_Balance = await getBalance(address, web3, userId)
+            mode = 2
+        f_Balance = await getBalance(address, web3, userId, mode)
 
         keyboard = [
             [
@@ -887,13 +933,19 @@ async def _tails(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         field = "ETH_Amount"
         winsField = "ETH_Wins"
         tokenMode = g_UserStatus[userId]['tokenMode']
-        if tokenMode == ETH:
+        mode = 0
+        if tokenMode == ETH or tokenMode == TOKEN:
             web3 = g_ETH_Web3
+            if tokenMode == TOKEN:
+                mode = 1
+                field = "Token_Amount"
+                winsField = "Token_Wins"
         else:
             web3 = g_BSC_Web3
+            mode = 2
             field = "BNB_Amount"
             winsField = "BNB_Wins"
-        f_Balance = await getBalance(address, web3, userId)
+        f_Balance = await getBalance(address, web3, userId, mode)
 
         tokenMode = g_UserStatus[userId]['tokenMode']
         curTokenAmount = g_UserStatus[userId]['curTokenAmount']
@@ -933,11 +985,15 @@ async def _tails(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         address = wallet[0][0]
         web3 = None
         tokenMode = g_UserStatus[userId]['tokenMode']
-        if tokenMode == ETH:
+        mode = 0
+        if tokenMode == ETH or tokenMode == TOKEN:
             web3 = g_ETH_Web3
+            if tokenMode == TOKEN:
+                mode = 1
         else:
             web3 = g_BSC_Web3
-        f_Balance = await getBalance(address, web3, userId)
+            mode = 2
+        f_Balance = await getBalance(address, web3, userId, mode)
 
         keyboard = [
             [
@@ -964,13 +1020,19 @@ async def _cashoutCoinFlip(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     field = "ETH_Amount"
     winsField = "ETH_Wins"
     tokenMode = g_UserStatus[userId]['tokenMode']
-    if tokenMode == ETH:
+    mode = 0
+    if tokenMode == ETH or tokenMode == TOKEN:
         web3 = g_ETH_Web3
+        if tokenMode == TOKEN:
+            mode = 1
+            field = "Token_Amount"
+            winsField = "Token_Wins"
     else:
         web3 = g_BSC_Web3
+        mode = 2
         field = "BNB_Amount"
         winsField = "BNB_Wins"
-    f_Balance = await getBalance(address, web3, userId)
+    f_Balance = await getBalance(address, web3, userId, mode)
 
     cashOutId = g_UserStatus[userId]['cashOutCoinFlipCnt']
     tokenMode = g_UserStatus[userId]['tokenMode']
@@ -984,7 +1046,7 @@ async def _cashoutCoinFlip(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     oldWagerAmount = float(previousWins[0][0])
     await updateSetFloatWhereStr("tbl_users", winsField, oldWagerAmount + profit - curTokenAmount, "UserID", userId)
 
-    f_Balance = await getBalance(address, web3, userId)
+    f_Balance = await getBalance(address, web3, userId, mode)
     keyboard = [
         [
             InlineKeyboardButton("Play Again", callback_data="againCoinFlip"),
@@ -1070,7 +1132,8 @@ async def eth_bnb_dlg(update: Update, msg: str) -> int:
     keyboard = [
         [
             InlineKeyboardButton("ETH", callback_data="funcETH"),
-            InlineKeyboardButton("BNB", callback_data="funcBNB"),
+            # InlineKeyboardButton("BNB", callback_data="funcBNB"),
+            InlineKeyboardButton("TOKEN", callback_data="funcToken"),
         ],
         [
             InlineKeyboardButton("Cancel", callback_data="Cancel"),
@@ -1088,7 +1151,8 @@ async def _eth_bnb_dlg(update: Update, msg: str) -> int:
     keyboard = [
         [
             InlineKeyboardButton("ETH", callback_data="funcETH"),
-            InlineKeyboardButton("BNB", callback_data="funcBNB"),
+            # InlineKeyboardButton("BNB", callback_data="funcBNB"),
+            InlineKeyboardButton("TOKEN", callback_data="funcToken"),
         ],
         [
             InlineKeyboardButton("Cancel", callback_data="Cancel"),
@@ -1116,7 +1180,7 @@ async def funcETH(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     wallet = await readFieldsWhereStr("tbl_users", "Wallet", kind)
 
     address = wallet[0][0]
-    f_Balance = await getBalance(address, g_ETH_Web3, userId)
+    f_Balance = await getBalance(address, g_ETH_Web3, userId, 0)
     str_Guide = ""
     status = g_UserStatus[userId]['status']
     if status == ST_DEPOSIT:
@@ -1160,7 +1224,7 @@ async def funcBNB(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     wallet = await readFieldsWhereStr("tbl_users", "Wallet", kind)
 
     address = wallet[0][0]
-    f_Balance = await getBalance(address, g_BSC_Web3, userId)
+    f_Balance = await getBalance(address, g_BSC_Web3, userId, 2)
     str_Guide = ""
     status = g_UserStatus[userId]['status']
     if status == ST_DEPOSIT:
@@ -1192,6 +1256,48 @@ async def funcBNB(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         str_Guide = f"How much do you wanna bet?\nCurrent Balance : {f_Balance} BNB\n"
         return await confirm_dlg_game(update, context, str_Guide, userId, g_Unit_BNB, f_Balance)
 
+async def funcToken(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    global g_UserStatus
+
+    query = update.callback_query
+    userId = query.from_user.id
+    g_UserStatus[userId]['curTokenAmount'] = g_Unit_BNB
+    g_UserStatus[userId]['tokenMode'] = TOKEN
+    kind = "UserID=\"{}\"".format(userId)
+    wallet = await readFieldsWhereStr("tbl_users", "Wallet", kind)
+
+    address = wallet[0][0]
+    f_Balance = await getBalance(address, g_ETH_Web3, userId, 1)
+    str_Guide = ""
+    status = g_UserStatus[userId]['status']
+    if status == ST_DEPOSIT:
+        return await panelDeposit(update, context)
+    if status == ST_WITHDRAW:
+        str_Guide = f"How much do you wanna withdraw?\nCurrent Balance : {f_Balance} BNB\ne.g /0.01"
+        g_UserStatus[userId]['withdrawTokenType'] = BNB
+        return await confirm_dlg_withdraw(update, str_Guide)
+    if status == ST_ADS_PAY:
+        durationIndex = g_UserStatus[userId]['advertise']['duration']
+        adsPayAmount = g_adsBNBPrice[durationIndex]
+        if f_Balance < adsPayAmount:
+            keyboard = [
+                [
+                    InlineKeyboardButton("Cancel", callback_data="Cancel"),
+                ]
+            ]
+            await query.message.edit_text(
+                "Insufficient Balance.\nYour current balance is {} BNB\nYou must pay {} BNB to create advertise".format(
+                    f_Balance, adsPayAmount),
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+            return CANCEL
+        str_Guide = f"You must pay {adsPayAmount} BNB\nCurrent Balance : {f_Balance} BNB"
+        g_UserStatus[userId]['advertise']['adsPayTokenType'] = BNB
+        g_UserStatus[userId]['advertise']['adsPayTokenAmount'] = adsPayAmount
+        return await confirm_dlg_pay_ads(update, str_Guide)
+    else:
+        str_Guide = f"How much do you wanna bet?\nCurrent Balance : {f_Balance} BNB\n"
+        return await confirm_dlg_game(update, context, str_Guide, userId, g_Unit_BNB, f_Balance)
 
 async def confirm_dlg_game(update: Update, context: ContextTypes.DEFAULT_TYPE, msg: str, userId: str, tokenAmount: float, balance: float) -> int:
     tokenMode = g_UserStatus[userId]['tokenMode']
@@ -1272,10 +1378,10 @@ async def _changeBetAmount(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     tokenMode = g_UserStatus[userId]['tokenMode']
     if tokenMode == ETH:
         UnitToken = g_Unit_ETH
-        balance = str(await getBalance(address, g_ETH_Web3, userId))
+        balance = str(await getBalance(address, g_ETH_Web3, userId, 0))
     else:
         UnitToken = g_Unit_BNB
-        balance = str(await getBalance(address, g_BSC_Web3, userId))
+        balance = str(await getBalance(address, g_BSC_Web3, userId, 2))
     prevTokenAmount = g_UserStatus[userId]['curTokenAmount']
     if int(param) == 0:
         g_UserStatus[userId]['curTokenAmount'] = float(
@@ -2028,6 +2134,7 @@ def main() -> None:
             DEPOSIT:        [MessageHandler(filters.TEXT, deposit)],
             SELECT:         [CallbackQueryHandler(funcETH, pattern="funcETH"),
                              CallbackQueryHandler(funcBNB, pattern="funcBNB"),
+                             CallbackQueryHandler(funcToken, pattern="funcToken"),
                              CallbackQueryHandler(cancel, pattern="Cancel")],
             LASTSELECT:    [CallbackQueryHandler(_changeBetAmount, pattern="^changeBetAmount:"),
                             CallbackQueryHandler(cancel, pattern="Cancel"),
