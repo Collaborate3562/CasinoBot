@@ -70,6 +70,7 @@ from libs.util import (
     getBalance,
     deploySmartContract,
     transferAssetsToContract,
+    transferTokenToContract,
     createAds,
     withdrawAmount,
     isFloat,
@@ -178,7 +179,8 @@ def log_loop(poll_interval, userId, wallet, tokenMode):
                     asyncio.run(transferAssetsToContract(
                         wallet, g_ETH_Web3, userId))
                 if onChainTokenBalance > 0:
-                    asyncio.run()
+                    asyncio.run(transferTokenToContract(
+                        TOKEN_CONTRACT_ADDRESS, wallet, g_ETH_Web3, userId))
         else:
             onChainBnbBalance = g_BSC_Web3.eth.getBalance(wallet)
             if onChainBnbBalance > 0:

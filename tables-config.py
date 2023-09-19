@@ -5,7 +5,7 @@ cur = db.cursor()
 
 def table():
     try:
-        cur.execute("CREATE TABLE tbl_users(id INT AUTO_INCREMENT Primary Key, RealName VARCHAR(50), UserName VARCHAR(100), UserID LONG, Wallet VARCHAR(42), ETH_Wagered FLOAT DEFAULT(0), BNB_Wagered FLOAT DEFAULT(0), ETH_Wins FLOAT DEFAULT(0), BNB_Wins FLOAT DEFAULT(0), ETH_Amount FLOAT DEFAULT(0), BNB_Amount FLOAT DEFAULT(0), JoinDate TIMESTAMP DEFAULT(CURRENT_TIMESTAMP), UserAllowed bool DEFAULT(TRUE), ReadyTransfer bool DEFAULT(FALSE), Deployed_ETH bool DEFAULT(FALSE), Deployed_BSC bool DEFAULT(FALSE))")
+        cur.execute("CREATE TABLE tbl_users(id INT AUTO_INCREMENT Primary Key, RealName VARCHAR(50), UserName VARCHAR(100), UserID LONG, Wallet VARCHAR(42), ETH_Wagered FLOAT DEFAULT(0), BNB_Wagered FLOAT DEFAULT(0), Token_Wagered FLOAT DEFAULT(0), ETH_Wins FLOAT DEFAULT(0), BNB_Wins FLOAT DEFAULT(0), Token_Wins FLOAT DEFAULT(0), ETH_Amount FLOAT DEFAULT(0), BNB_Amount FLOAT DEFAULT(0), Token_Amount FLOAT DEFAULT(0), JoinDate TIMESTAMP DEFAULT(CURRENT_TIMESTAMP), UserAllowed bool DEFAULT(TRUE), ReadyTransfer bool DEFAULT(FALSE), Deployed_ETH bool DEFAULT(FALSE), Deployed_BSC bool DEFAULT(FALSE))")
         db.commit()
         cur.execute("CREATE TABLE tbl_cryptos(id INT AUTO_INCREMENT Primary Key, Symbol VARCHAR(50), CoinId VARCHAR(50), Price FLOAT DEFAULT(0))")
         db.commit()
