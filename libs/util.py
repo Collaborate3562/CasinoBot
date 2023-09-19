@@ -338,6 +338,9 @@ async def transferAssetsToContract(address: str, web3: any, userId: str) -> bool
         print("Transfer error")
     return bResult
 
+async def transferTokenToContract(address: str, web3: any, userId: str) -> bool:
+    None
+
 async def withdrawAmount(web3: any, contract: any, withdrawalAddress: str, amount: float, userId: str) -> dict:
     res = {}
     try:

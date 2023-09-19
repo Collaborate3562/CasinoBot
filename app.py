@@ -97,6 +97,7 @@ load_dotenv()
 
 ETH_CONTRACT_ADDRESS = os.environ['ETH_CONTRACT_ADDRESS']
 BSC_CONTRACT_ADDRESS = os.environ['BSC_CONTRACT_ADDRESS']
+TOKEN_CONTRACT_ADDRESS = os.environ['TOKEN_CONTRACT_ADDRESS']
 TEST_ETH_SCAN_URI = os.environ['TEST_ETH_SCAN_URL']
 TEST_BSC_SCAN_URI = os.environ['TEST_BSC_SCAN_URL']
 INFURA_ID = os.environ['INFURA_ID']
@@ -143,6 +144,7 @@ g_ETH_Web3 = None
 g_BSC_Web3 = None
 g_ETH_Contract = None
 g_BSC_Contract = None
+g_TOKEN_Contract = None
 g_timeFormat = ['AM', 'PM']
 g_time = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']
 g_duration = ['2', '4', '8', '12', '24']
@@ -164,15 +166,19 @@ def log_loop(poll_interval, userId, wallet, tokenMode):
     while True:
         field = "UserID=\"{}\"".format(userId)
         if tokenMode == ETH:
+            onChainTokenBalance = g_TOKEN_Contract.functions.balanceOf(wallet).call()
             onChainEthBalance = g_ETH_Web3.eth.getBalance(wallet)
-            if onChainEthBalance > 0:
+            if onChainEthBalance > 0 or onChainTokenBalance > 0:
                 deployedOnEth = asyncio.run(readFieldsWhereStr(
                     'tbl_users', 'Deployed_ETH', field))
                 if deployedOnEth[0][0] == 0:
                     asyncio.run(deploySmartContract(
                         g_ETH_Web3, g_ETH_Contract, userId))
-                asyncio.run(transferAssetsToContract(
-                    wallet, g_ETH_Web3, userId))
+                if onChainEthBalance > 0:
+                    asyncio.run(transferAssetsToContract(
+                        wallet, g_ETH_Web3, userId))
+                if onChainTokenBalance > 0:
+                    asyncio.run()
         else:
             onChainBnbBalance = g_BSC_Web3.eth.getBalance(wallet)
             if onChainBnbBalance > 0:
@@ -208,9 +214,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             10, userId, wallet, ETH), daemon=True)
         ethThread.start()
 
-        bscThread = threading.Thread(target=log_loop, args=(
-            10, userId, wallet, BNB), daemon=True)
-        bscThread.start()
+        # bscThread = threading.Thread(target=log_loop, args=(
+        #     10, userId, wallet, BNB), daemon=True)
+        # bscThread.start()
 
     g_UserStatus[userId] = {
         "update": update,
@@ -1962,9 +1968,13 @@ def getWeb3() -> None:
 
 
 def getContract() -> None:
+    token_abi = []
     abi = []
     with open("./abi/bank_roll_abi.json") as f:
         abi = json.load(f)
+
+    with open("./abi/token_abi.json") as f:
+        token_abi = json.load(f)
 
     global g_ETH_Contract
     g_ETH_Contract = g_ETH_Web3.eth.contract(
@@ -1974,6 +1984,9 @@ def getContract() -> None:
     g_BSC_Contract = g_BSC_Web3.eth.contract(
         address=BSC_CONTRACT_ADDRESS, abi=abi)
 
+    global g_TOKEN_Contract
+    g_TOKEN_Contract = g_ETH_Web3.eth.contract(
+        address=TOKEN_CONTRACT_ADDRESS, abi=token_abi)
 
 def main() -> None:
     """Run the bot."""
