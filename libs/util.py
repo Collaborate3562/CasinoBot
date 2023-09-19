@@ -48,8 +48,12 @@ async def getPricefromAmount(amount : float, kind : int) -> float:
         price = await readFieldsWhereStr('tbl_cryptos', 'Price', 'Symbol=\'eth\'')
         price = price[0][0]
         value = amount * price
-    else :
+    elif kind == 1 :
         price = await readFieldsWhereStr('tbl_cryptos', 'Price', 'Symbol=\'bnb\'')
+        price = price[0][0]
+        value = amount * price
+    elif kind == 2 :
+        price = await readFieldsWhereStr('tbl_cryptos', 'Price', 'Symbol=\'token\'')
         price = price[0][0]
         value = amount * price
     return value
