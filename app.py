@@ -265,9 +265,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         ],
         [
             InlineKeyboardButton("LeaderBoard", callback_data="Board"),
-            InlineKeyboardButton("ADS", callback_data="advertise"),
-        ],
-        [
             InlineKeyboardButton("Help", callback_data="Help"),
         ]
     ]
@@ -359,8 +356,19 @@ async def _playHilo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     init(userId)
     global g_UserStatus
     g_UserStatus[userId]['status'] = ST_HILO
+    
     str_Guide = f"{g_HiloMark}Which token do you wanna bet?\n"
     return await _eth_bnb_dlg(update, str_Guide)
+
+async def playCoinFlip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    userInfo = update.message.from_user
+    userId = userInfo['id']
+    init(userId)
+    global g_UserStatus
+    g_UserStatus[userId]['status'] = ST_COINFLIP
+
+    str_Guide = f"{g_CoinFlipMark}Which token do you wanna bet?\n"
+    return await eth_bnb_dlg(update, str_Guide)
 
 async def _playCoinFlip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
@@ -368,6 +376,7 @@ async def _playCoinFlip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     init(userId)
     global g_UserStatus
     g_UserStatus[userId]['status'] = ST_COINFLIP
+    
     str_Guide = f"{g_CoinFlipMark}Which token do you wanna bet?\n"
     return await _eth_bnb_dlg(update, str_Guide)
 
@@ -859,9 +868,9 @@ async def _heads(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             winsField = "BNB_Wins"
         f_Balance = await getBalance(address, web3, userId, mode)
 
-        tokenMode = g_UserStatus[userId]['tokenMode']
         curTokenAmount = g_UserStatus[userId]['curTokenAmount']
         init(userId)
+        g_UserStatus[userId]['tokenMode'] = tokenMode
         g_UserStatus[userId]['curTokenAmount'] = curTokenAmount
         profit = curTokenAmount * 2
         await updateSetFloatWhereStr("tbl_users", field, (f_Balance + profit), "UserID", userId)
@@ -949,9 +958,9 @@ async def _tails(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             winsField = "BNB_Wins"
         f_Balance = await getBalance(address, web3, userId, mode)
 
-        tokenMode = g_UserStatus[userId]['tokenMode']
         curTokenAmount = g_UserStatus[userId]['curTokenAmount']
         init(userId)
+        g_UserStatus[userId]['tokenMode'] = tokenMode
         g_UserStatus[userId]['curTokenAmount'] = curTokenAmount
         profit = curTokenAmount * 2
         await updateSetFloatWhereStr("tbl_users", field, (f_Balance + profit), "UserID", userId)
@@ -1384,7 +1393,7 @@ async def _changeBetAmount(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         balance = str(await getBalance(address, g_BSC_Web3, userId, 2))
     elif tokenMode == CUSTOMTOKEN:
         UnitToken = g_Unit_TOKEN
-        balance = str(await getBalance(address, g_BSC_Web3, userId, 1))
+        balance = str(await getBalance(address, g_ETH_Web3, userId, 1))
     prevTokenAmount = g_UserStatus[userId]['curTokenAmount']
     if int(param) == 0:
         g_UserStatus[userId]['curTokenAmount'] = float(
@@ -2127,6 +2136,7 @@ def main() -> None:
                       CommandHandler("help", help),
                       CommandHandler("hilo", playHilo),
                       CommandHandler("slot", playSlot),
+                      CommandHandler("coinflip", playCoinFlip),
                       CommandHandler("withdraw", withdraw),
                       CommandHandler("board", board),
                       CommandHandler("deposit", deposit),
