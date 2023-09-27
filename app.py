@@ -249,7 +249,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     }
     init(userId)
 
-    str_Greetings = f"🙋‍♀️Hi @{userName}\nWelcome to Aleekk Casino!\n"
+    str_Greetings = f"🙋‍♀️Hi @{userName}\nWelcome to JackBot Casino!\n"
     str_Intro = f"Please enjoy High-Low & Slot machine games here.\n"
     print('You talk with user {} and his user ID: {} '.format(userName, userId))
 
@@ -1601,7 +1601,7 @@ async def help(update: Update, context: CallbackContext) -> int:
 
     await update.message.reply_text(
         g_Greetings + g_Help + g_Wallet + g_Deposit + g_Withdraw +
-        g_Hilo + g_CoinFilp +g_Slot + g_LeaderBoard + g_AdsBoard,
+        g_Hilo + g_CoinFilp +g_Slot + g_LeaderBoard,
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
@@ -1618,7 +1618,7 @@ async def _help(update: Update, context: CallbackContext) -> None:
     ]
     await query.message.edit_text(
         g_Greetings + g_Help + g_Wallet + g_Deposit + g_Withdraw +
-        g_Hilo + g_CoinFilp + g_Slot + g_LeaderBoard + g_AdsBoard,
+        g_Hilo + g_CoinFilp + g_Slot + g_LeaderBoard,
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
@@ -1816,7 +1816,7 @@ async def adsUrl(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
     if text[0] != '/':
         await update.message.reply_text(
-            f"Incorrect form field.\ne.g /https://t.me/AleekkCalls",
+            f"Incorrect form field.\ne.g /https://t.me/JackCalls",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
         return
@@ -1867,7 +1867,7 @@ async def _adsTime(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     ]
 
     await query.message.edit_text(
-        f"👉🔗 Please submit the URL to be featured in the ad.\n    e.g /https://t.me/AleekkCalls",
+        f"👉🔗 Please submit the URL to be featured in the ad.\n    e.g /https://t.me/JackCalls",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
     return ADSURL
@@ -1930,7 +1930,7 @@ async def board(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     topWinners = "🏆 Top 5 Winners 🎊"
 
     # get all adsContent from database
-    adsContent = "All ads will be showed here..."
+    adsContent = ""
 
     ethPrice = await readFieldsWhereStr('tbl_cryptos', 'Price', 'Symbol=\'eth\'')
     ethPrice = ethPrice[0][0]
@@ -1984,7 +1984,7 @@ async def _board(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     topWinners = "🏆 Top 5 Winners 🎊"
 
     # get all adsContent from database
-    adsContent = "All ads will be showed here...\n"
+    adsContent = ""
 
     ethPrice = await readFieldsWhereStr('tbl_cryptos', 'Price', 'Symbol=\'eth\'')
     ethPrice = ethPrice[0][0]
@@ -1997,11 +1997,8 @@ async def _board(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
     i = 0
     while i < len(topWagered):
-        topWagers += "\n" + "@" + \
-            topWagered[i][0] + ": " + \
-            "{:.2f}".format(topWagered[i][1]) + " USD"
-        topWinners += "\n" + "@" + \
-            topWins[i][0] + ": " + "{:.2f}".format(topWins[i][1]) + " USD"
+        topWagers += "\n" + "@" + topWagered[i][0] + ": " + "{:.2f}".format(topWagered[i][1]) + " USD"
+        topWinners += "\n" + "@" + topWins[i][0] + ": " + "{:.2f}".format(topWins[i][1]) + " USD"
 
         i += 1
 
